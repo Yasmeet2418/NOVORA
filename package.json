@@ -1,0 +1,24 @@
+{
+  "name": "recallmate-ai",
+  "version": "2.0.0",
+  "description": "RecallMate AI — Advanced AI Learning and Competitive Examination Preparation Platform",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "education",
+    "ai-tutor",
+    "jee",
+    "neet",
+    "nda",
+    "cuet",
+    "cbse",
+    "revision",
+    "spaced-repetition"
+  ],
+  "author": "RecallMate AI Team",
+  "license": "MIT"
+}
