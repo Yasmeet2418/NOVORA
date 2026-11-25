@@ -5,16 +5,22 @@ const DATA_ENDPOINT = `${SUPABASE_URL}/rest/v1/recallmate_user_data`;
 const PROFILE_ENDPOINT = `${SUPABASE_URL}/rest/v1/profiles`;
 
 async function request(path, { method = "GET", body, session, headers = {} } = {}) {
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
-    method,
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      "Content-Type": "application/json",
-      ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      ...headers
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {})
-  });
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_URL}${path}`, {
+      method,
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        ...headers
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {})
+    });
+  } catch (error) {
+    const endpoint = new URL(path, SUPABASE_URL).pathname;
+    throw new Error(`Could not reach Supabase (${method} ${endpoint}): ${error.message || String(error)}`);
+  }
 
   const responseBody = await response.text();
   let result = null;
