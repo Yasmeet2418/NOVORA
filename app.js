@@ -15,7 +15,9 @@ import { createJeeMainMockForm } from "./data/jeeMainPracticeBank.js";
 import {
   getAuthSession,
   loadUserData,
+  loadUserProfile,
   saveUserData,
+  saveUserProfile,
   signInWithPassword,
   signOut,
   signUpWithPassword
@@ -56,15 +58,18 @@ async function initializeAuthentication() {
     authSession = await getAuthSession();
     if (authSession) {
       const cloudState = await loadUserData(authSession);
+      const cloudProfile = await loadUserProfile(authSession);
       store.switchAccount(authSession.user.id, cloudState, authSession.user);
+      const profileChanged = applyCloudProfile(cloudProfile);
+      if (!cloudProfile) await saveUserProfile(authSession, store.get().userProfile);
       authReady = true;
       renderApp();
-      if (!cloudState) scheduleCloudSync(store.get());
+      if (!cloudState || !cloudProfile || profileChanged) scheduleCloudSync(store.get());
       return;
     }
   } catch (error) {
     console.error("Could not restore the Supabase session:", error);
-    authMessage = `Could not connect to your account: ${error.message}`;
+    authMessage = `Could not connect to your account: ${getAuthenticationErrorMessage(error)}`;
     authSession = null;
   }
   authReady = true;
@@ -85,6 +90,7 @@ function scheduleCloudSync(state) {
         cloudData.aiSettings.searchEngineCx = "";
       }
       await saveUserData(currentSession, cloudData);
+      await saveUserProfile(currentSession, state.userProfile || {});
       cloudSyncError = "";
       const status = document.getElementById("cloud-sync-status");
       if (status) status.textContent = "Your account data is synced.";
@@ -95,6 +101,31 @@ function scheduleCloudSync(state) {
       if (status) status.textContent = cloudSyncError;
     }
   }, 700);
+}
+
+function applyCloudProfile(profileRow) {
+  if (!profileRow) return false;
+  const current = store.get().userProfile || {};
+  const savedHours = Number(profileRow.daily_target_hours);
+  const profile = {
+    name: profileRow.full_name || current.name || "Student",
+    classLevel: profileRow.class_level || current.classLevel || "Class 10",
+    targetExam: profileRow.target_exam || current.targetExam || "jee-main",
+    dailyTargetHours: Number.isFinite(savedHours) && savedHours > 0
+      ? savedHours
+      : current.dailyTargetHours || 3.5
+  };
+  const changed = Object.keys(profile).some(key => current[key] !== profile[key]);
+  if (changed) store.updateProfile(profile);
+  return changed;
+}
+
+function getAuthenticationErrorMessage(error) {
+  const message = error?.message || "Could not authenticate. Please try again.";
+  if (message.toLowerCase().includes("profiles")) {
+    return `Profile storage is not set up yet. Run supabase/schema.sql in the Supabase SQL Editor, then try again. Details: ${message}`;
+  }
+  return message;
 }
 
 function renderAuthenticationView() {
@@ -1775,7 +1806,11 @@ window.RecallMateApp = {
         const result = await signUpWithPassword(email, password, name);
         session = result?.access_token ? result : null;
         if (!session) {
-          authMessage = "Account created. Check your email to confirm the account, then sign in.";
+          const identities = result?.user?.identities;
+          if (Array.isArray(identities) && identities.length === 0) {
+            throw new Error("An account with this email already exists. Sign in instead.");
+          }
+          authMessage = "Supabase still requires email confirmation. To enable instant sign-in, turn off Confirm email in Authentication → Sign In / Providers → Email. If this account was created while confirmation was on, create it again after changing the setting.";
           return;
         }
       } else {
@@ -1783,15 +1818,18 @@ window.RecallMateApp = {
       }
 
       const cloudState = await loadUserData(session);
-      authSession = session;
+      const cloudProfile = await loadUserProfile(session);
       store.switchAccount(session.user.id, cloudState, session.user);
+      const profileChanged = applyCloudProfile(cloudProfile);
+      if (!cloudProfile) await saveUserProfile(session, store.get().userProfile);
+      authSession = session;
       authReady = true;
       cloudSyncError = "";
       renderApp();
-      if (!cloudState) scheduleCloudSync(store.get());
+      if (!cloudState || !cloudProfile || profileChanged) scheduleCloudSync(store.get());
     } catch (error) {
       console.error("Authentication failed:", error);
-      authMessage = error.message || "Could not authenticate. Please try again.";
+      authMessage = getAuthenticationErrorMessage(error);
       renderApp();
     } finally {
       authLoading = false;

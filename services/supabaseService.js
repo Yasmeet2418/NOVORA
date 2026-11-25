@@ -2,6 +2,7 @@ const SUPABASE_URL = "https://kefmjhvjzpcumzcsvgcz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HCw5F0A1l4wzRP7w7tjy6g_-3hcgoYq";
 const SESSION_KEY = "recallmate:supabase-session:v1";
 const DATA_ENDPOINT = `${SUPABASE_URL}/rest/v1/recallmate_user_data`;
+const PROFILE_ENDPOINT = `${SUPABASE_URL}/rest/v1/profiles`;
 
 async function request(path, { method = "GET", body, session, headers = {} } = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
@@ -102,6 +103,33 @@ export async function signOut(session) {
 export async function loadUserData(session) {
   const rows = await request(`${DATA_ENDPOINT}?select=data&limit=1`, { session });
   return Array.isArray(rows) && rows[0]?.data ? rows[0].data : null;
+}
+
+export async function loadUserProfile(session) {
+  const query = new URLSearchParams({
+    select: "full_name,class_level,target_exam,daily_target_hours",
+    id: `eq.${session.user.id}`,
+    limit: "1"
+  });
+  const rows = await request(`${PROFILE_ENDPOINT}?${query}`, { session });
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function saveUserProfile(session, profile) {
+  const dailyTargetHours = Number(profile.dailyTargetHours);
+  await request(`${PROFILE_ENDPOINT}?on_conflict=id`, {
+    method: "POST",
+    session,
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: {
+      id: session.user.id,
+      full_name: String(profile.name || "").trim(),
+      class_level: profile.classLevel || "Class 10",
+      target_exam: profile.targetExam || "jee-main",
+      daily_target_hours: Number.isFinite(dailyTargetHours) && dailyTargetHours > 0 ? dailyTargetHours : 3.5,
+      updated_at: new Date().toISOString()
+    }
+  });
 }
 
 export async function saveUserData(session, data) {
