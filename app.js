@@ -30,8 +30,10 @@ let mockTimerInterval = null;
 let searchDebounce = null;
 let authSession = null;
 let authReady = false;
+let cloudReady = false;
 let authMode = "signin";
 let authLoading = false;
+let cloudRetrying = false;
 let authMessage = "";
 let cloudSyncError = "";
 let cloudSyncTimer = null;
@@ -44,7 +46,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initRouter();
   initGlobalEvents();
   store.subscribe((state) => {
-    if (authSession && authReady) scheduleCloudSync(state);
+    if (authSession && authReady && cloudReady) scheduleCloudSync(state);
     // Re-render when state changes if not actively taking a timed test
     if (authReady && !activeMockTest) {
       renderApp();
@@ -55,28 +57,56 @@ window.addEventListener("DOMContentLoaded", () => {
 
 async function initializeAuthentication() {
   try {
-    authSession = await getAuthSession();
-    if (authSession) {
-      const cloudState = await loadUserData(authSession);
-      const cloudProfile = await loadUserProfile(authSession);
-      store.switchAccount(authSession.user.id, cloudState, authSession.user);
-      const profileChanged = applyCloudProfile(cloudProfile);
-      if (!cloudProfile) await saveUserProfile(authSession, store.get().userProfile);
-      authReady = true;
-      renderApp();
-      if (!cloudState || !cloudProfile || profileChanged) scheduleCloudSync(store.get());
+    const session = await getAuthSession();
+    if (session) {
+      await connectAuthenticatedSession(session);
       return;
     }
   } catch (error) {
     console.error("Could not restore the Supabase session:", error);
     authMessage = `Could not connect to your account: ${getAuthenticationErrorMessage(error)}`;
     authSession = null;
+    cloudReady = false;
   }
   authReady = true;
   renderApp();
 }
 
+async function connectAuthenticatedSession(session) {
+  authSession = session;
+  authReady = false;
+  cloudReady = false;
+
+  try {
+    const cloudState = await loadUserData(session);
+    const cloudProfile = await loadUserProfile(session);
+    store.switchAccount(session.user.id, cloudState, session.user);
+    const profileChanged = applyCloudProfile(cloudProfile);
+    if (!cloudProfile) await saveUserProfile(session, store.get().userProfile);
+    cloudReady = true;
+    cloudSyncError = "";
+    renderApp();
+    if (!cloudState || !cloudProfile || profileChanged) scheduleCloudSync(store.get());
+    return true;
+  } catch (error) {
+    console.error("Could not load account data:", error);
+    authReady = true;
+    if (!error.message.startsWith("Could not reach Supabase (")) {
+      authSession = null;
+      cloudSyncError = "";
+      authMessage = getAuthenticationErrorMessage(error);
+      renderApp();
+      return false;
+    }
+
+    cloudSyncError = `Your account is signed in, but cloud data could not be loaded. ${error.message}`;
+    renderApp();
+    return false;
+  }
+}
+
 function scheduleCloudSync(state) {
+  if (!cloudReady) return;
   if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(async () => {
     try {
@@ -197,6 +227,39 @@ function renderAuthenticationView() {
   `;
 }
 
+function renderCloudConnectionView() {
+  return `
+    <main class="auth-page">
+      <div class="auth-shell">
+        <section class="auth-story" aria-label="About NOVORA">
+          <a class="auth-brand" href="#/" aria-label="NOVORA home">
+            <span class="auth-brand-mark" aria-hidden="true">N</span>
+            <span>NOVORA</span>
+          </a>
+          <div class="auth-story-content">
+            <span class="auth-eyebrow">YOUR PERSONAL LEARNING COPILOT</span>
+            <h1>Understand more.<br>Stress less.</h1>
+            <p class="auth-story-description">Your account is signed in. NOVORA is waiting for a connection to load your private learning data.</p>
+          </div>
+        </section>
+        <section class="auth-panel" aria-labelledby="cloud-connection-title">
+          <div class="auth-panel-mobile-brand" aria-hidden="true"><span class="auth-brand-mark">N</span><span>NOVORA</span></div>
+          <div class="auth-panel-intro">
+            <span class="auth-panel-eyebrow">ACCOUNT SIGNED IN</span>
+            <h2 id="cloud-connection-title">Cloud data unavailable</h2>
+            <p>Your account is signed in, but your learning data has not loaded. No cloud data will be overwritten while this connection is unavailable.</p>
+          </div>
+          <div class="auth-alert" role="alert">${escapeHtml(cloudSyncError)}</div>
+          <button type="button" class="btn btn-primary auth-submit" onclick="window.RecallMateApp.retryCloudConnection()" ${cloudRetrying ? "disabled" : ""}>
+            ${cloudRetrying ? "Retrying..." : "Retry connection"}
+          </button>
+          <button type="button" class="btn btn-secondary auth-submit" onclick="window.RecallMateApp.logout()">Log out</button>
+        </section>
+      </div>
+    </main>
+  `;
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -299,8 +362,16 @@ function initGlobalEvents() {
 export function renderApp() {
   const root = document.getElementById("root");
   if (!root) return;
-  if (!authReady || !authSession) {
+  if (!authReady) {
     root.innerHTML = renderAuthenticationView();
+    return;
+  }
+  if (!authSession) {
+    root.innerHTML = renderAuthenticationView();
+    return;
+  }
+  if (!cloudReady) {
+    root.innerHTML = renderCloudConnectionView();
     return;
   }
 
@@ -1817,16 +1888,7 @@ window.RecallMateApp = {
         session = await signInWithPassword(email, password);
       }
 
-      const cloudState = await loadUserData(session);
-      const cloudProfile = await loadUserProfile(session);
-      store.switchAccount(session.user.id, cloudState, session.user);
-      const profileChanged = applyCloudProfile(cloudProfile);
-      if (!cloudProfile) await saveUserProfile(session, store.get().userProfile);
-      authSession = session;
-      authReady = true;
-      cloudSyncError = "";
-      renderApp();
-      if (!cloudState || !cloudProfile || profileChanged) scheduleCloudSync(store.get());
+      await connectAuthenticatedSession(session);
     } catch (error) {
       console.error("Authentication failed:", error);
       authMessage = getAuthenticationErrorMessage(error);
@@ -1840,6 +1902,7 @@ window.RecallMateApp = {
   async logout() {
     const session = authSession;
     authSession = null;
+    cloudReady = false;
     assistantConversation = [];
     assistantLoading = false;
     if (cloudSyncTimer) {
@@ -1853,6 +1916,29 @@ window.RecallMateApp = {
       authMessage = `Signed out on this device, but the server sign-out request failed: ${error.message}`;
     } finally {
       authReady = true;
+      renderApp();
+    }
+  },
+
+  async retryCloudConnection() {
+    if (!authSession || cloudRetrying) return;
+    cloudRetrying = true;
+    cloudSyncError = "Retrying the Supabase data connection...";
+    renderApp();
+    try {
+      const session = await getAuthSession();
+      if (!session) {
+        authSession = null;
+        cloudReady = false;
+        authMessage = "Your account session expired. Please sign in again.";
+        return;
+      }
+      await connectAuthenticatedSession(session);
+    } catch (error) {
+      console.error("Could not retry the account data connection:", error);
+      cloudSyncError = `Could not load cloud data. ${error.message || String(error)}`;
+    } finally {
+      cloudRetrying = false;
       renderApp();
     }
   },
