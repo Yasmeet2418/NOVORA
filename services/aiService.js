@@ -1,6 +1,6 @@
 // NOVORA — Academic AI Service
-// Integrates with backend /api/chat for real SSE streaming, multimodal image analysis, and web search grounding.
-// Includes graceful fallback to direct Gemini API or offline academic intelligence engine.
+// Integrates with backend /api/chat for Gemini responses, multimodal image analysis, and web search grounding.
+// Uses only known offline explanations as a fallback; unsupported questions surface service errors.
 
 import { store } from "./store.js";
 
@@ -46,9 +46,9 @@ export async function askStudyAssistant({
   const settings = store.get().aiSettings || {};
   const userApiKey = (settings.geminiApiKey || "").trim();
 
-  // Try calling the backend /api/chat endpoint with SSE streaming
+  // Try calling the backend /api/chat endpoint
   try {
-    const streamResult = await callBackendStreamingChat({
+    const streamResult = await callBackendChat({
       query,
       classLevel,
       targetExam,
@@ -71,6 +71,8 @@ export async function askStudyAssistant({
       throw backendErr;
     }
 
+    let lastError = backendErr;
+
     // Direct Gemini fallback if user has API key and running client-side
     if (userApiKey) {
       try {
@@ -87,22 +89,26 @@ export async function askStudyAssistant({
         });
       } catch (geminiErr) {
         console.warn("Direct Gemini call failed:", geminiErr);
+        lastError = geminiErr;
       }
     }
 
     // Offline Academic Engine fallback
     const offlineAns = generateOfflineStudyAnswer({ query, classLevel, targetExam, depth, mode });
-    if (onChunk) {
-      onChunk(offlineAns.content, offlineAns.content);
+    if (offlineAns) {
+      if (onChunk) {
+        onChunk(offlineAns.content, offlineAns.content);
+      }
+      return offlineAns;
     }
-    return offlineAns;
+    throw lastError;
   }
 }
 
 /**
- * Call backend /api/chat with SSE Streaming
+ * Call backend /api/chat, supporting JSON and SSE responses
  */
-async function callBackendStreamingChat({
+async function callBackendChat({
   query,
   classLevel,
   targetExam,
@@ -235,7 +241,7 @@ async function callBackendStreamingChat({
  * Direct Gemini API Caller (Client-side fallback)
  */
 async function callDirectGemini({ apiKey, query, classLevel, targetExam, depth, mode, language, conversationHistory, onChunk }) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
   const langPrompt = language === "hi"
     ? "Answer in formal Hindi (हिन्दी) with English technical terms in parentheses."
@@ -248,11 +254,11 @@ ${langPrompt}
 Response Mode: ${mode}.
 Depth: ${depth}.
 Rules:
-1. Ground answers strictly in academic facts and NCERT/CBSE/NTA/UPSC standards.
-2. Structure with headings, step-by-step logic, equations, and intuitive analogies.
-3. Highlight common exam mistakes.
-4. Always end with "### 📝 Quick Revision Summary".
-If uncertain, state so honestly. Never hallucinate.`;
+1. Answer the exact question first and use earlier messages to understand follow-ups.
+2. Never invent facts, values, steps, sources, or syllabus policies. State uncertainty and assumptions.
+3. For calculations, show givens, formula, substitutions, units, and a reasonableness check.
+4. Explain concepts clearly; use examples and exam tips only when helpful.
+5. Use readable Markdown and include a concise revision summary for full explanations or exam solutions.`;
 
   const contents = [];
   conversationHistory.slice(-4).forEach(h => {
@@ -281,7 +287,10 @@ If uncertain, state so honestly. Never hallucinate.`;
   }
 
   const data = await response.json();
-  const answerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
+  const answerText = (data.candidates?.[0]?.content?.parts || [])
+    .filter(part => part.text && !part.thought)
+    .map(part => part.text)
+    .join("") || "No response received.";
 
   if (onChunk) {
     onChunk(answerText, answerText);
@@ -364,7 +373,7 @@ function generateOfflineStudyAnswer({ query, classLevel, targetExam, depth, mode
   }
 
   // General Academic Handler for all other academic queries
-  return buildGeneralAcademicResponse(query, classLevel, targetExam, depth, mode);
+  return null;
 }
 
 function buildAcademicResponse({ topic, mode, classLevel, targetExam, simple, detailed, examTips, formulas, definitions, revisionSummary }) {
@@ -398,44 +407,6 @@ function buildAcademicResponse({ topic, mode, classLevel, targetExam, simple, de
   return {
     title: topic,
     content: `${mainBody}${formulasSection}${definitionsSection}${summarySection}`,
-    mode,
-    classLevel,
-    targetExam
-  };
-}
-
-function buildGeneralAcademicResponse(query, classLevel, targetExam, depth, mode) {
-  const cleanTopic = query.replace(/[?.,!]/g, "").trim();
-
-  return {
-    title: `Academic Explanation: ${cleanTopic}`,
-    content: `### 📚 Concept Overview: ${cleanTopic}
-Target Level: **${classLevel || "General"}** | Focus: **${targetExam || "Comprehensive"}** | Depth: **${depth}**
-
-1. **Fundamental Definition:**
-${cleanTopic} is a core academic concept studied in ${classLevel}. Understanding it requires connecting theoretical principles with empirical observation and mathematical rigor.
-
-2. **Core Mechanisms & Principles:**
-- **Step 1:** Establish fundamental definitions and boundary conditions.
-- **Step 2:** Formulate the relationship between driving forces and observable system changes.
-- **Step 3:** Apply conservation laws (mass, charge, energy, or momentum depending on context).
-
-3. **Real-Life Example & Analogy:**
-To visualize ${cleanTopic}, observe how balanced equilibrium systems adjust when subjected to external perturbations. Like a thermostat regulating room temperature, academic models describe how systems stabilize under changing parameters.
-
-4. **Exam-Oriented Insights (${targetExam || "Board Exam"}):**
-- Highlight clear step-by-step reasoning rather than jumping straight to numerical answers.
-- State standard assumptions, initial units, and sign conventions explicitly.
-- Check dimensions on both sides of every equation.
-
-### 📐 Governing Principles & Formulas
-- Standard Relationship: \`Primary Variable = Constant × Secondary Variable\`
-- Equilibrium Condition: \`Net Rate of Change = 0\`
-
-### 📝 Quick Revision Summary
-- Understand the core definition before attempting derivative problems.
-- Connect concepts to conservation principles.
-- Practice 5–10 past examination problems to cement pattern recognition.`,
     mode,
     classLevel,
     targetExam

@@ -105,7 +105,7 @@ export const handler = async (event) => {
       body: JSON.stringify({
         error: 'NO_API_KEY',
         message: 'Gemini API key is not configured. Get a free API key at https://aistudio.google.com/app/apikey and enter it in Settings.',
-        hint: 'NOVORA can use Google Gemini 1.5/2.0 Flash for academic explanations.'
+        hint: 'NOVORA uses Google Gemini Flash for academic explanations.'
       })
     };
   }
@@ -153,10 +153,12 @@ ${depthInstructions}
 ${modeInstructions}
 
 CORE RULES:
-1. Ground answers strictly in verified academic facts and official syllabus guidelines (NCERT, CBSE, NTA, UPSC).
-2. If you do not know the answer with certainty, state so honestly. Never invent facts.
-3. Structure your response using GitHub-Flavored Markdown with clear headings, step-by-step explanations, formulas, and ASCII diagrams where applicable.
-4. End EVERY explanation with a "### 📝 Quick Revision Summary" section with high-yield bullet points.
+1. Answer the exact question first, then add only useful explanation. Keep follow-up answers conversational and use the prior chat for context.
+2. Never invent facts, values, steps, sources, or syllabus policies. If uncertain or missing information, say so and state any assumptions.
+3. For calculations, identify givens, show the formula and substitutions, include units, and check that the result is reasonable.
+4. For concepts, explain cause and effect clearly; use an example or analogy only when it helps.
+5. Use official syllabus guidance when relevant. Only cite sources included in verified search results; do not make up citations.
+6. Use readable Markdown, and include a concise revision summary for full explanations or exam solutions.
 ${searchContext}`;
 
   const contents = [];
@@ -173,7 +175,7 @@ ${searchContext}`;
   }
   contents.push({ role: 'user', parts: currentParts });
 
-  const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`;
+  const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${activeApiKey}`;
   const payload = {
     contents,
     system_instruction: { parts: [{ text: systemInstructionText }] },
@@ -181,11 +183,17 @@ ${searchContext}`;
   };
 
   try {
-    const upstreamResp = await fetch(geminiEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    let upstreamResp;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      upstreamResp = await fetch(geminiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (upstreamResp.status !== 503 || attempt === 2) break;
+      await upstreamResp.body?.cancel();
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
 
     if (!upstreamResp.ok) {
       const errText = await upstreamResp.text();
@@ -195,7 +203,10 @@ ${searchContext}`;
     }
 
     const data = await upstreamResp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = (data.candidates?.[0]?.content?.parts || [])
+      .filter(part => part.text && !part.thought)
+      .map(part => part.text)
+      .join('');
 
     // Return as a streaming-compatible JSON response
     // Frontend will receive full text at once (Netlify doesn't support true SSE streaming)

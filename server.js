@@ -2,7 +2,7 @@
 // Zero external npm dependencies — Runs natively with Node.js ES Modules (Node 18+)
 // Features:
 // 1. Static SPA web server with MIME types
-// 2. Real Gemini LLM API Streaming (Server-Sent Events) with Multimodal Image Support
+// 2. Gemini LLM API responses with Multimodal Image Support
 // 3. Real-Time Web Search & Official Examination Directory Grounding
 // 4. Multi-turn conversation context, academic depth tuning, and Hindi/English support
 
@@ -313,7 +313,7 @@ async function handleChatRequest(req, res) {
     res.end(JSON.stringify({
       error: 'NO_API_KEY',
       message: 'Gemini API key is not configured. Get a free API key at https://aistudio.google.com/app/apikey and enter it in Settings or set GEMINI_API_KEY in your .env file.',
-      hint: 'NOVORA can use Google Gemini 1.5/2.0 Flash for academic explanations.'
+      hint: 'NOVORA uses Google Gemini Flash for academic explanations.'
     }));
     return;
   }
@@ -364,16 +364,12 @@ ${depthInstructions}
 ${modeInstructions}
 
 CORE RULES:
-1. Ground answers strictly in verified academic facts, mathematics, and official syllabus guidelines (NCERT, CBSE, NTA, UPSC).
-2. If you do not know the answer with certainty or if information is not available in official records, state so honestly. Never invent facts or syllabus policies.
-3. Structure your response cleanly using GitHub-Flavored Markdown:
-   - Clear topic heading
-   - Step-by-step logical explanations
-   - Real-life analogies or intuitive mental models
-   - Formatted mathematical equations and formulas
-   - ASCII or structured diagrams where applicable (circuits, ray paths, chemical mechanisms, flowcharts)
-   - Common student traps & misconceptions to avoid in exams
-   - End EVERY explanation with a designated "### 📝 Quick Revision Summary" section containing high-yield bullet points.
+1. Answer the exact question first, then add only useful explanation. Keep follow-up answers conversational and use the prior chat for context.
+2. Never invent facts, values, steps, sources, or syllabus policies. If uncertain or missing information, say so and state any assumptions.
+3. For calculations, identify givens, show the formula and substitutions, include units, and check that the result is reasonable.
+4. For concepts, explain cause and effect clearly; use an example or analogy only when it helps.
+5. Use official syllabus guidance when relevant. Only cite sources included in verified search results; do not make up citations.
+6. Use readable Markdown, and include a concise revision summary for full explanations or exam solutions.
 ${searchContext}`;
 
   // Assemble Gemini Contents
@@ -410,9 +406,7 @@ ${searchContext}`;
     parts: currentParts
   });
 
-  // Call Gemini API with Streaming
-  // Use gemini-1.5-flash for speed and reliability, supports gemini-2.0-flash
-  const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${activeApiKey}`;
+  const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${activeApiKey}`;
 
   const payload = {
     contents,
@@ -427,11 +421,17 @@ ${searchContext}`;
   };
 
   try {
-    const upstreamResp = await fetch(geminiEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    let upstreamResp;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      upstreamResp = await fetch(geminiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (upstreamResp.status !== 503 || attempt === 2) break;
+      await upstreamResp.body?.cancel();
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
 
     if (!upstreamResp.ok) {
       const errText = await upstreamResp.text();
@@ -446,62 +446,23 @@ ${searchContext}`;
       return;
     }
 
-    // Set SSE Streaming Headers
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*'
-    });
-
-    // Send sources header event if search sources are present
-    if (searchSources.length > 0) {
-      res.write(`data: ${JSON.stringify({ sources: searchSources })}\n\n`);
+    const data = await upstreamResp.json();
+    const text = (data.candidates?.[0]?.content?.parts || [])
+      .filter(part => part.text && !part.thought)
+      .map(part => part.text)
+      .join('');
+    if (!text) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'EMPTY_AI_RESPONSE', message: 'The AI provider returned no answer. Please try again.' }));
+      return;
     }
 
-    // Read upstream SSE stream
-    const reader = upstreamResp.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep last unfinished line
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data:')) continue;
-        const jsonStr = trimmed.slice(5).trim();
-        if (jsonStr === '[DONE]') continue;
-
-        try {
-          const chunkData = JSON.parse(jsonStr);
-          const chunkText = chunkData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (chunkText) {
-            res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
-          }
-        } catch {
-          // ignore non-json SSE lines
-        }
-      }
-    }
-
-    // Close SSE stream
-    res.write('data: [DONE]\n\n');
-    res.end();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ text, sources: searchSources }));
   } catch (err) {
-    console.error('Gemini stream error:', err);
-    if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'UPSTREAM_FETCH_FAILED', message: err.message }));
-    } else {
-      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-      res.end();
-    }
+    console.error('Gemini request failed:', err);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'UPSTREAM_FETCH_FAILED', message: err.message }));
   }
 }
 
@@ -645,7 +606,7 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log('  Tagline: "Learn. Practice. Rise."');
   console.log('  Endpoints:');
   console.log('    • GET  /api/status');
-  console.log('    • POST /api/chat   (Streaming SSE & Multimodal)');
+  console.log('    • POST /api/chat   (Gemini AI & multimodal)');
   console.log('    • POST /api/search (Real-Time Official Portals)');
   console.log('====================================================');
 });

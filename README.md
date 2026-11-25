@@ -15,6 +15,8 @@ NOVORA is a comprehensive educational and competitive examination preparation pl
 - **Upcoming Examination Calendar**: Real official dates and countdowns for JEE Main, NEET UG, NDA, and CBSE Board exams.
 
 ### 2. AI Study Assistant — Ask Anything
+- **Chat-Style Tutor**: Keep follow-up questions in context, start a fresh chat, and see cited web sources when available.
+- **Personalized Answers**: Choose English, Hindi, or Hinglish, plus school or competitive depth and a response style.
 - **6 Response Modes**:
   1. *Simple Explanation*: Plain language, everyday analogies, minimal jargon.
   2. *Detailed Academic*: In-depth theoretical rigor with comprehensive context.
@@ -22,8 +24,8 @@ NOVORA is a comprehensive educational and competitive examination preparation pl
   4. *Quick Revision*: Rapid, high-density bulleted review in under 2 minutes.
   5. *Conceptual Understanding*: First-principles deep dive and thought experiments.
   6. *Advanced Problem-Solving*: Rigorous mathematical derivations and step-by-step solutions.
-- **Academic Grounding**: Formatted with mathematical formulas, scientific laws, analogies, real-life examples, and an automatic revision summary after every explanation.
-- **Dual Engine**: Built-in comprehensive academic intelligence that works offline + live Google Gemini API integration when configured.
+- **Accuracy Guardrails**: The tutor is instructed to show calculation steps and units, avoid invented citations, and state uncertainty. AI answers can still make mistakes and should be checked.
+- **AI Availability**: Gemini Flash powers general questions. A small built-in reference covers a few common topics offline; other questions show a clear service error instead of a generic fabricated answer.
 
 ### 3. Class-Wise Learning System (Classes 6–12)
 - Dedicated curricula for **Class 6, 7, 8, 9, 10, 11, and 12**.

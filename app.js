@@ -33,6 +33,8 @@ let authLoading = false;
 let authMessage = "";
 let cloudSyncError = "";
 let cloudSyncTimer = null;
+let assistantConversation = [];
+let assistantLoading = false;
 
 // Initialize App
 window.addEventListener("DOMContentLoaded", () => {
@@ -97,33 +99,69 @@ function scheduleCloudSync(state) {
 
 function renderAuthenticationView() {
   if (!authReady) {
-    return `<main style="min-height:100vh;display:grid;place-items:center;font-family:Inter,sans-serif;color:#475569;">Connecting to NOVORA...</main>`;
+    return `<main class="auth-loading">Connecting to NOVORA...</main>`;
   }
 
   const isSignUp = authMode === "signup";
   const escapedMessage = escapeHtml(authMessage);
   return `
-    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#eef8f0,#e8f4f4);font-family:Inter,sans-serif;">
-      <section style="width:min(100%,440px);padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.1);">
-        <div style="font-size:1.55rem;font-weight:800;color:#0f2e39;margin-bottom:6px;">NOVORA</div>
-        <p style="color:#64748b;margin:0 0 24px;">${isSignUp ? "Create your account to save your study progress." : "Sign in to continue to your study workspace."}</p>
-        ${authMessage ? `<div role="alert" style="margin-bottom:16px;padding:12px;border-radius:8px;background:#fff1f2;color:#be123c;font-size:.875rem;line-height:1.45;">${escapedMessage}</div>` : ""}
-        <form onsubmit="window.RecallMateApp.submitAuthentication(event)">
+    <main class="auth-page">
+      <div class="auth-shell">
+        <section class="auth-story" aria-label="About NOVORA">
+          <a class="auth-brand" href="#/" aria-label="NOVORA home">
+            <span class="auth-brand-mark" aria-hidden="true">N</span>
+            <span>NOVORA</span>
+          </a>
+          <div class="auth-story-content">
+            <span class="auth-eyebrow">YOUR PERSONAL LEARNING COPILOT</span>
+            <h1>Understand more.<br>Stress less.</h1>
+            <p class="auth-story-description">A calmer way to learn, practise, and prepare. Get step-by-step help from your AI study partner and keep your progress in one place.</p>
+            <div class="auth-feature-list">
+              <div><span class="auth-feature-icon" aria-hidden="true">✦</span><span>Ask study questions and get clear, guided explanations</span></div>
+              <div><span class="auth-feature-icon" aria-hidden="true">✓</span><span>Practise with mock tests built around your goals</span></div>
+              <div><span class="auth-feature-icon" aria-hidden="true">↗</span><span>Pick up where you left off on any device</span></div>
+            </div>
+            <div class="auth-demo-card" aria-label="Example AI tutor conversation">
+              <div class="auth-demo-heading"><span class="auth-demo-avatar">✦</span><span>MEET YOUR STUDY PARTNER</span></div>
+              <div class="auth-demo-question">Can you explain a tough topic in simple steps?</div>
+              <div class="auth-demo-answer"><span class="auth-demo-sparkle" aria-hidden="true">✦</span><span>Absolutely. I’ll break it down, show the reasoning, and help you check your understanding.</span></div>
+            </div>
+          </div>
+          <p class="auth-story-footer">Built for curious minds and ambitious goals.</p>
+        </section>
+
+        <section class="auth-panel" aria-labelledby="auth-title">
+          <div class="auth-panel-mobile-brand" aria-hidden="true"><span class="auth-brand-mark">N</span><span>NOVORA</span></div>
+          <div class="auth-panel-intro">
+            <span class="auth-panel-eyebrow">${isSignUp ? "START YOUR JOURNEY" : "WELCOME BACK"}</span>
+            <h2 id="auth-title">${isSignUp ? "Create your account" : "Sign in to NOVORA"}</h2>
+            <p>${isSignUp ? "Save your learning progress and make a plan that fits you." : "Your study space is ready when you are."}</p>
+          </div>
+          ${authMessage ? `<div class="auth-alert" role="alert">${escapedMessage}</div>` : ""}
+          <form class="auth-form" onsubmit="window.RecallMateApp.submitAuthentication(event)">
           ${isSignUp ? `
-            <label for="auth-name" style="display:block;margin-bottom:6px;font-size:.85rem;font-weight:600;">Name</label>
-            <input id="auth-name" name="name" autocomplete="name" required maxlength="80" style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:16px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">
+            <div class="auth-field">
+              <label for="auth-name">Your name</label>
+              <input class="auth-input" id="auth-name" name="name" autocomplete="name" required maxlength="80" placeholder="How should we address you?">
+            </div>
           ` : ""}
-          <label for="auth-email" style="display:block;margin-bottom:6px;font-size:.85rem;font-weight:600;">Email</label>
-          <input id="auth-email" name="email" type="email" autocomplete="email" required style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:16px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">
-          <label for="auth-password" style="display:block;margin-bottom:6px;font-size:.85rem;font-weight:600;">Password</label>
-          <input id="auth-password" name="password" type="password" autocomplete="${isSignUp ? "new-password" : "current-password"}" minlength="${isSignUp ? "8" : "1"}" required style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:20px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">
-          <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;" ${authLoading ? "disabled" : ""}>${authLoading ? "Please wait..." : (isSignUp ? "Create account" : "Sign in")}</button>
-        </form>
-        <p style="margin:18px 0 0;text-align:center;color:#64748b;font-size:.9rem;">
-          ${isSignUp ? "Already have an account?" : "New to NOVORA?"}
-          <button type="button" class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="window.RecallMateApp.setAuthenticationMode('${isSignUp ? "signin" : "signup"}')">${isSignUp ? "Sign in" : "Create account"}</button>
-        </p>
-      </section>
+            <div class="auth-field">
+              <label for="auth-email">Email address</label>
+              <input class="auth-input" id="auth-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+            </div>
+            <div class="auth-field">
+              <label for="auth-password">Password</label>
+              <input class="auth-input" id="auth-password" name="password" type="password" autocomplete="${isSignUp ? "new-password" : "current-password"}" minlength="${isSignUp ? "8" : "1"}" required placeholder="${isSignUp ? "At least 8 characters" : "Enter your password"}">
+            </div>
+            <button type="submit" class="btn btn-primary auth-submit" ${authLoading ? "disabled" : ""}>${authLoading ? "Please wait..." : (isSignUp ? "Create my account" : "Sign in")}<span aria-hidden="true">→</span></button>
+          </form>
+          <p class="auth-switch">
+            ${isSignUp ? "Already have an account?" : "New to NOVORA?"}
+            <button type="button" class="auth-toggle-btn" onclick="window.RecallMateApp.setAuthenticationMode('${isSignUp ? "signin" : "signup"}')">${isSignUp ? "Sign in" : "Create a free account"}</button>
+          </p>
+          <p class="auth-privacy-note">Your account keeps your learning progress private and synced.</p>
+        </section>
+      </div>
     </main>
   `;
 }
@@ -218,6 +256,10 @@ function initGlobalEvents() {
     }
     if (e.key === "Escape") {
       closeModals();
+    }
+    if (e.key === "Enter" && !e.shiftKey && e.target?.id === "study-query-input") {
+      e.preventDefault();
+      e.target.closest("form")?.requestSubmit();
     }
   });
 }
@@ -506,81 +548,124 @@ function renderDashboardView(state) {
 }
 
 // --- 2. AI Study Assistant – Ask Anything View ---
+function renderAssistantTranscript() {
+  if (assistantConversation.length === 0) {
+    return `
+      <div class="assistant-welcome">
+        <div class="assistant-welcome-mark" aria-hidden="true">✦</div>
+        <h3>What are you learning today?</h3>
+        <p>Ask a question, share what you’re stuck on, or try one of the suggested prompts. Follow up naturally to go deeper.</p>
+      </div>
+    `;
+  }
+
+  return assistantConversation.map(message => {
+    const isUser = message.sender === "user";
+    const sources = (message.sources || []).map(source => {
+      try {
+        const url = new URL(source.url);
+        if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+        return `<a href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || source.sourceName || url.hostname)} ↗</a>`;
+      } catch {
+        return "";
+      }
+    }).join("");
+
+    return `
+      <article class="chat-message ${isUser ? "chat-message-user" : "chat-message-assistant"}">
+        <div class="chat-message-avatar" aria-hidden="true">${isUser ? "You" : "N"}</div>
+        <div class="chat-message-body">
+          <div class="chat-message-label">${isUser ? "You" : "NOVORA"}${message.pending ? " · thinking" : ""}</div>
+          ${message.text
+            ? `<div class="chat-bubble ${message.error ? "chat-bubble-error" : ""}">${escapeHtml(message.text)}</div>`
+            : `<div class="chat-bubble chat-bubble-pending"><span class="chat-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>Working through your question…</span></div>`
+          }
+          ${sources ? `<div class="chat-sources"><span>Sources</span>${sources}</div>` : ""}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderAssistantView(state) {
   const profile = state.userProfile || {};
 
   return `
-    <div class="page-header">
-      <h1 class="page-title">AI Study Assistant — Ask Anything</h1>
-      <p class="page-subtitle">Get grounded explanations, analogies, formulas, and step-by-step solutions tuned to ${profile.classLevel} & ${profile.targetExam ? profile.targetExam.toUpperCase() : "Exams"}.</p>
+    <div class="page-header assistant-page-header">
+      <div>
+        <span class="assistant-page-eyebrow">YOUR PERSONAL AI TUTOR</span>
+        <h1 class="page-title">Ask NOVORA</h1>
+        <p class="page-subtitle">Clear, step-by-step study help for ${escapeHtml(profile.classLevel || "your class")} and ${escapeHtml(profile.targetExam ? profile.targetExam.toUpperCase() : "your goals")}.</p>
+      </div>
+      <button type="button" class="btn btn-secondary assistant-new-chat" onclick="window.RecallMateApp.clearAssistantConversation()" ${assistantLoading ? "disabled" : ""}>＋ New chat</button>
     </div>
 
-    <div style="display: grid; grid-template-columns: 280px 1fr; gap: 24px;">
-      <!-- Controls Panel -->
-      <div class="card" style="height: fit-content;">
-        <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 14px;">Response Tuning</h3>
-
-        <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">RESPONSE MODE</label>
-        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px;" id="mode-selector">
-          ${RESPONSE_MODES.map((m, idx) => `
-            <button
-              class="btn btn-sm ${idx === 1 ? "btn-primary" : "btn-secondary"}"
-              style="justify-content: flex-start; text-align: left; font-size: 0.8rem;"
-              onclick="window.RecallMateApp.selectResponseMode('${m.id}', this)"
-              data-mode="${m.id}"
-            >
-              ${m.name}
-            </button>
-          `).join("")}
-        </div>
-
-        <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">ACADEMIC DEPTH</label>
-        <select id="assistant-depth" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); margin-bottom: 18px; font-size: 0.85rem;">
-          <option value="beginner">Beginner (Gentle introduction & analogies)</option>
-          <option value="intermediate" selected>Intermediate (Standard curriculum depth)</option>
-          <option value="advanced">Advanced (Competitive exam rigor)</option>
-        </select>
-
-        <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">QUICK TOPIC PROMPTS</label>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; justify-content: flex-start;" onclick="window.RecallMateApp.askQuickTopic('How does the discriminant b² - 4ac determine the nature of roots in quadratic equations?')">📐 Quadratic Discriminant</button>
-          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; justify-content: flex-start;" onclick="window.RecallMateApp.askQuickTopic('Explain Faraday\\'s Law and Lenz\\'s Law with real-life examples and motional EMF.')">⚡ Faraday & Lenz's Law</button>
-          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; justify-content: flex-start;" onclick="window.RecallMateApp.askQuickTopic('What happens in the light-dependent reactions of photosynthesis and where does oxygen come from?')">🌿 Photosynthesis Light Stage</button>
-          <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; justify-content: flex-start;" onclick="window.RecallMateApp.askQuickTopic('Why is RuBisCO called an oxygenase and how does photorespiration happen in C3 plants?')">🔬 RuBisCO & C3 Plants</button>
-        </div>
-      </div>
-
-      <!-- Interactive Chat & Answer Console -->
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <!-- Input Box -->
-        <div class="card" style="padding: 16px;">
-          <form onsubmit="window.RecallMateApp.submitStudyQuestion(event)">
-            <textarea
-              id="study-query-input"
-              rows="3"
-              placeholder="Ask anything about any academic topic (e.g., 'Derive Snell's Law', 'Explain the Causes of the French Revolution', 'How do I solve shortest distance between skew lines?')..."
-              style="width: 100%; border: none; background: transparent; font-family: inherit; font-size: 0.95rem; color: var(--text-primary); resize: none; outline: none;"
-              required
-            ></textarea>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 8px;">
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Grounded AI &bull; Formatted with formulas, analogies & revision summary</span>
-              <button type="submit" class="btn btn-primary" id="ask-btn">
-                <span>Ask NOVORA</span>
-                <span>⚡</span>
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Answer Display -->
-        <div id="assistant-output-container">
-          <div class="card" style="padding: 32px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 2.5rem; margin-bottom: 12px;">💡</div>
-            <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Ask any academic question above</h3>
-            <p style="font-size: 0.875rem; margin-top: 6px;">NOVORA provides step-by-step solutions, mathematical formulas, real-life analogies, and concise revision summaries.</p>
+    <div class="assistant-layout">
+      <aside class="assistant-rail">
+        <section class="card assistant-rail-card">
+          <div class="assistant-rail-brand">
+            <span class="assistant-rail-mark" aria-hidden="true">✦</span>
+            <div><h2>Study with NOVORA</h2><p>Ask follow-up questions anytime.</p></div>
           </div>
+          <div class="assistant-context-pill"><span aria-hidden="true">◎</span> ${escapeHtml(profile.classLevel || "Student")} · ${escapeHtml(profile.targetExam ? profile.targetExam.toUpperCase() : "General")}</div>
+        </section>
+
+        <section class="card assistant-rail-card">
+          <h3 class="assistant-rail-title">Try a question</h3>
+          <div class="assistant-prompt-list">
+            <button type="button" class="assistant-prompt" onclick="window.RecallMateApp.askQuickTopic('Explain the quadratic formula and show how to use it with an example.')"><span>📐</span><span>Explain the quadratic formula</span><span aria-hidden="true">→</span></button>
+            <button type="button" class="assistant-prompt" onclick="window.RecallMateApp.askQuickTopic('Explain Faraday’s law and Lenz’s law with a simple example.')"><span>⚡</span><span>Make sense of Faraday’s law</span><span aria-hidden="true">→</span></button>
+            <button type="button" class="assistant-prompt" onclick="window.RecallMateApp.askQuickTopic('Explain photosynthesis step by step and where the oxygen comes from.')"><span>🌿</span><span>How does photosynthesis work?</span><span aria-hidden="true">→</span></button>
+          </div>
+        </section>
+
+        <details class="card assistant-settings" open>
+          <summary>Response settings</summary>
+          <label for="assistant-depth">Answer level</label>
+          <select id="assistant-depth">
+            <option value="beginner">Simple foundations</option>
+            <option value="intermediate" selected>School level</option>
+            <option value="board">Board exam</option>
+            <option value="competitive">Competitive exam</option>
+          </select>
+          <label for="assistant-language">Answer language</label>
+          <select id="assistant-language">
+            <option value="en">English</option>
+            <option value="hinglish">Hinglish</option>
+            <option value="hi">Hindi</option>
+          </select>
+          <label>Answer style</label>
+          <div id="mode-selector" class="assistant-mode-list">
+            ${RESPONSE_MODES.map((mode, index) => `
+              <button
+                type="button"
+                class="btn btn-sm ${index === 1 ? "btn-primary" : "btn-secondary"}"
+                onclick="window.RecallMateApp.selectResponseMode('${mode.id}', this)"
+                data-mode="${mode.id}"
+              >${escapeHtml(mode.name)}</button>
+            `).join("")}
+          </div>
+        </details>
+      </aside>
+
+      <section class="assistant-chat">
+        <header class="assistant-chat-header">
+          <div class="assistant-chat-avatar" aria-hidden="true">✦</div>
+          <div><h2>Study chat</h2><p>Ask anything. Your follow-ups stay in context.</p></div>
+        </header>
+        <div id="assistant-output-container" class="assistant-transcript" role="log" aria-live="polite" aria-relevant="additions text">
+          ${renderAssistantTranscript()}
         </div>
-      </div>
+        <form class="assistant-composer" onsubmit="window.RecallMateApp.submitStudyQuestion(event)">
+          <label class="sr-only" for="study-query-input">Your question</label>
+          <textarea id="study-query-input" rows="2" maxlength="4000" placeholder="Ask NOVORA anything you’re studying…" required ${assistantLoading ? "disabled" : ""}></textarea>
+          <div class="assistant-composer-footer">
+            <span>Enter to send · Shift + Enter for a new line</span>
+            <button type="submit" class="btn btn-primary" ${assistantLoading ? "disabled" : ""}><span>${assistantLoading ? "Thinking..." : "Send"}</span><span aria-hidden="true">↑</span></button>
+          </div>
+        </form>
+        <p class="assistant-disclaimer">AI can make mistakes. Double-check important facts and exam instructions.</p>
+      </section>
     </div>
   `;
 }
@@ -1717,6 +1802,8 @@ window.RecallMateApp = {
   async logout() {
     const session = authSession;
     authSession = null;
+    assistantConversation = [];
+    assistantLoading = false;
     if (cloudSyncTimer) {
       clearTimeout(cloudSyncTimer);
       cloudSyncTimer = null;
@@ -1745,58 +1832,94 @@ window.RecallMateApp = {
   },
 
   askQuickTopic(query) {
-    const input = document.getElementById("study-query-input");
-    if (input) {
+    window.location.hash = "#/assistant";
+    setTimeout(() => {
+      const input = document.getElementById("study-query-input");
+      if (!input) return;
       input.value = query;
-      window.location.hash = "#/assistant";
-      setTimeout(() => {
-        const form = input.closest("form");
-        if (form) form.dispatchEvent(new Event("submit", { cancelable: true }));
-      }, 50);
-    }
+      input.closest("form")?.requestSubmit();
+    }, 0);
+  },
+
+  clearAssistantConversation() {
+    if (assistantLoading) return;
+    assistantConversation = [];
+    const container = document.getElementById("assistant-output-container");
+    if (container) container.innerHTML = renderAssistantTranscript();
   },
 
   async submitStudyQuestion(e) {
     e.preventDefault();
+    if (assistantLoading) return;
     const input = document.getElementById("study-query-input");
-    const container = document.getElementById("assistant-output-container");
+    if (!input) return;
     const depthSelect = document.getElementById("assistant-depth");
+    const languageSelect = document.getElementById("assistant-language");
     const activeBtn = document.querySelector("#mode-selector button.btn-primary");
     const mode = activeBtn ? activeBtn.getAttribute("data-mode") : "detailed";
     const query = input.value.trim();
     if (!query) return;
 
     const profile = store.get().userProfile;
-    container.innerHTML = `
-      <div class="card" style="padding: 32px; text-align: center;">
-        <div style="font-size: 2rem; animation: spin 1s linear infinite; display: inline-block;">⚡</div>
-        <h3 style="margin-top: 12px; font-size: 1.05rem;">Synthesizing Academic Grounding...</h3>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">Formulating response with step-by-step logic, formulas, and revision summary.</p>
-      </div>
-    `;
+    const conversationHistory = assistantConversation.slice(-6);
+    const userMessage = { sender: "user", text: query };
+    const assistantMessage = { sender: "assistant", text: "", pending: true };
+    assistantConversation.push(userMessage, assistantMessage);
+    assistantConversation = assistantConversation.slice(-40);
+    assistantLoading = true;
+    input.value = "";
+    input.disabled = true;
+    const submitButton = input.closest("form")?.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.innerHTML = "<span>Thinking...</span><span aria-hidden=\"true\">…</span>";
+    }
+    const container = document.getElementById("assistant-output-container");
+    if (container) container.innerHTML = renderAssistantTranscript();
 
     try {
       const response = await askStudyAssistant({
         query,
-        classLevel: profile.classLevel,
+        classLevel: profile.classLevel || "General",
         targetExam: profile.targetExam,
         depth: depthSelect ? depthSelect.value : "intermediate",
-        mode
+        mode,
+        language: languageSelect ? languageSelect.value : "en",
+        conversationHistory,
+        onChunk: text => {
+          assistantMessage.text = text;
+          assistantMessage.pending = !text;
+          const transcript = document.getElementById("assistant-output-container");
+          if (transcript) {
+            transcript.innerHTML = renderAssistantTranscript();
+            transcript.scrollTop = transcript.scrollHeight;
+          }
+        }
       });
-
-      container.innerHTML = `
-        <div class="card" style="border-left: 4px solid var(--lavender-500);">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-            <span class="nav-item-badge badge-purple">${response.mode.toUpperCase()} MODE</span>
-            <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('ai-response-text').innerText); alert('Copied response to clipboard!');">📋 Copy</button>
-          </div>
-          <div id="ai-response-text" style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap;">
-${response.content}
-          </div>
-        </div>
-      `;
+      assistantMessage.text = response.content || "I couldn't generate a response. Please try asking in a different way.";
+      assistantMessage.sources = response.sources || [];
     } catch (err) {
-      container.innerHTML = `<div class="card" style="border-left: 4px solid var(--accent-rose); color: var(--accent-rose);">Error generating answer: ${err.message}</div>`;
+      console.error("Could not generate an AI study answer:", err);
+      assistantMessage.error = true;
+      assistantMessage.text = `I couldn't get a reliable answer right now. ${err.message || "Please try again in a moment."}`;
+    } finally {
+      assistantMessage.pending = false;
+      assistantLoading = false;
+      const transcript = document.getElementById("assistant-output-container");
+      if (transcript) {
+        transcript.innerHTML = renderAssistantTranscript();
+        transcript.scrollTop = transcript.scrollHeight;
+      }
+      const nextInput = document.getElementById("study-query-input");
+      if (nextInput) {
+        nextInput.disabled = false;
+        const nextSubmitButton = nextInput.closest("form")?.querySelector('button[type="submit"]');
+        if (nextSubmitButton) {
+          nextSubmitButton.disabled = false;
+          nextSubmitButton.innerHTML = "<span>Send</span><span aria-hidden=\"true\">↑</span>";
+        }
+        nextInput.focus();
+      }
     }
   },
 
