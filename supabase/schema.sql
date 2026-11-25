@@ -83,3 +83,5 @@ create policy "Users can update their own RecallMate data"
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+notify pgrst, 'reload schema';
