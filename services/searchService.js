@@ -1,4 +1,4 @@
-// RecallMate AI — Educational Resource Search & Discovery Service
+// NOVORA — Educational Resource Search & Discovery Service
 // Dual Engine:
 // 1. Live Backend /api/search (DuckDuckGo + Google Custom Search + Official Portals)
 // 2. Authoritative Verified Educational Directory (NTA, CBSE, NCERT, UPSC, SSC, Swayam)

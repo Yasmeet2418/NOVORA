@@ -1,4 +1,4 @@
-// RecallMate AI — Real Academic AI Service
+// NOVORA — Academic AI Service
 // Integrates with backend /api/chat for real SSE streaming, multimodal image analysis, and web search grounding.
 // Includes graceful fallback to direct Gemini API or offline academic intelligence engine.
 
@@ -243,7 +243,7 @@ async function callDirectGemini({ apiKey, query, classLevel, targetExam, depth, 
     ? "Answer in natural student Hinglish (Hindi + English)."
     : "Answer in precise academic English.";
 
-  const systemPrompt = `You are RecallMate AI, an expert academic tutor for school boards (${classLevel}) and competitive exams (${targetExam}).
+  const systemPrompt = `You are NOVORA, an expert academic tutor for school boards (${classLevel}) and competitive exams (${targetExam}).
 ${langPrompt}
 Response Mode: ${mode}.
 Depth: ${depth}.

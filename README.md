@@ -1,8 +1,8 @@
-# RecallMate AI
+# NOVORA
 
-> **"Learn smarter. Revise better. Crack your goals."**
+> **"Learn. Practice. Rise."**
 
-RecallMate AI is a comprehensive, production-grade educational and competitive examination preparation platform. It unites an AI-powered study assistant, multi-format note processing, syllabus and PYQ intelligence, and realistic mock exam simulation into one unified workspace.
+NOVORA is a comprehensive educational and competitive examination preparation platform. It unites an AI-powered study assistant, multi-format note processing, syllabus and PYQ intelligence, and realistic mock exam simulation into one unified workspace.
 
 ---
 
@@ -114,7 +114,7 @@ Modular, exam-specific dashboards with verified syllabi, official marking scheme
 - Quiz score trends, topic mastery rates, and mock test score progressions.
 
 ### 13. Stuckpoint Recovery (`/#/recovery`)
-- Preserved from the original RecallMate web application.
+- Preserved from the original learning platform.
 - Dedicated recovery area to review concepts flagged as difficult or missed during quizzes until mastered.
 
 ---

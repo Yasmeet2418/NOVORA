@@ -1,7 +1,7 @@
 {
-  "name": "recallmate-ai",
+  "name": "novora-ai",
   "version": "2.0.0",
-  "description": "RecallMate AI — Advanced AI Learning and Competitive Examination Preparation Platform",
+  "description": "NOVORA — AI-powered learning and competitive examination preparation platform",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -19,6 +19,6 @@
     "revision",
     "spaced-repetition"
   ],
-  "author": "RecallMate AI Team",
+  "author": "NOVORA Team",
   "license": "MIT"
 }

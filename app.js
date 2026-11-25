@@ -1,5 +1,5 @@
-// RecallMate AI — Core Platform Controller & Single Page Application Router
-// "Learn smarter. Revise better. Crack your goals."
+// NOVORA — Core Learning and Exam Preparation Platform
+// "Learn. Practice. Rise."
 
 import { store } from "./services/store.js";
 import { parseUploadedFile } from "./services/fileParser.js";
@@ -97,15 +97,15 @@ function scheduleCloudSync(state) {
 
 function renderAuthenticationView() {
   if (!authReady) {
-    return `<main style="min-height:100vh;display:grid;place-items:center;font-family:Inter,sans-serif;color:#475569;">Connecting to RecallMate...</main>`;
+    return `<main style="min-height:100vh;display:grid;place-items:center;font-family:Inter,sans-serif;color:#475569;">Connecting to NOVORA...</main>`;
   }
 
   const isSignUp = authMode === "signup";
   const escapedMessage = escapeHtml(authMessage);
   return `
-    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#f5f3ff,#eff6ff);font-family:Inter,sans-serif;">
+    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#eef8f0,#e8f4f4);font-family:Inter,sans-serif;">
       <section style="width:min(100%,440px);padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.1);">
-        <div style="font-size:1.55rem;font-weight:800;color:#0f172a;margin-bottom:6px;">RecallMate AI</div>
+        <div style="font-size:1.55rem;font-weight:800;color:#0f2e39;margin-bottom:6px;">NOVORA</div>
         <p style="color:#64748b;margin:0 0 24px;">${isSignUp ? "Create your account to save your study progress." : "Sign in to continue to your study workspace."}</p>
         ${authMessage ? `<div role="alert" style="margin-bottom:16px;padding:12px;border-radius:8px;background:#fff1f2;color:#be123c;font-size:.875rem;line-height:1.45;">${escapedMessage}</div>` : ""}
         <form onsubmit="window.RecallMateApp.submitAuthentication(event)">
@@ -120,7 +120,7 @@ function renderAuthenticationView() {
           <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;" ${authLoading ? "disabled" : ""}>${authLoading ? "Please wait..." : (isSignUp ? "Create account" : "Sign in")}</button>
         </form>
         <p style="margin:18px 0 0;text-align:center;color:#64748b;font-size:.9rem;">
-          ${isSignUp ? "Already have an account?" : "New to RecallMate?"}
+          ${isSignUp ? "Already have an account?" : "New to NOVORA?"}
           <button type="button" class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="window.RecallMateApp.setAuthenticationMode('${isSignUp ? "signin" : "signup"}')">${isSignUp ? "Sign in" : "Create account"}</button>
         </p>
       </section>
@@ -132,6 +132,60 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[char]);
+}
+
+function renderNavigationMenu(currentPath, state) {
+  const groups = [
+    {
+      title: "Learn",
+      items: [
+        ["📊", "Dashboard", "/", currentPath === "/"],
+        ["🤖", "AI Study Assistant", "/assistant", currentPath === "/assistant"],
+        ["🏫", "Classes 6–12", "/classes", currentPath.startsWith("/classes")],
+        ["📁", `Smart Notes (${state.notes.length})`, "/notes", currentPath.startsWith("/notes") || currentPath === "/add"]
+      ]
+    },
+    {
+      title: "Prepare",
+      items: [
+        ["🎯", "Exam Hub", "/exams", currentPath.startsWith("/exams")],
+        ["⏱️", "Mock Tests", "/mock-test", currentPath === "/mock-test"],
+        ["📡", "Priority Radar", "/radar", currentPath === "/radar"],
+        ["🔄", "PYQ Intelligence", "/pyq-intelligence", currentPath === "/pyq-intelligence"]
+      ]
+    },
+    {
+      title: "Tools",
+      items: [
+        ["❓", "AI Doubt Solver", "/doubts", currentPath === "/doubts"],
+        ["📅", "Study Planner", "/planner", currentPath === "/planner"],
+        ["🛟", `Stuckpoint Recovery (${state.recoveries.filter(item => item.status === "struggling").length})`, "/recovery", currentPath === "/recovery"],
+        ["🌐", "External Resources", "/resources", currentPath === "/resources"],
+        ["📈", "Performance & Retention", "/analytics", ["/analytics", "/progress", "/memory"].includes(currentPath)],
+        ["⚙️", "Settings", "/settings", currentPath === "/settings"]
+      ]
+    }
+  ];
+
+  return `
+    <details class="nav-dropdown" id="primary-menu">
+      <summary class="nav-menu-trigger" aria-label="Open navigation menu">
+        <span aria-hidden="true">☰</span><span>Menu</span><span class="nav-menu-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="nav-menu-panel">
+        ${groups.map(group => `
+          <div class="nav-menu-group">
+            <div class="nav-menu-heading">${group.title}</div>
+            ${group.items.map(([icon, label, href, active]) => `
+              <a class="nav-menu-link ${active ? "active" : ""}" href="#${href}" onclick="this.closest('details').removeAttribute('open')">
+                <span aria-hidden="true">${icon}</span><span>${label}</span>
+              </a>
+            `).join("")}
+          </div>
+        `).join("")}
+      </div>
+    </details>
+  `;
 }
 
 function initTheme() {
@@ -183,114 +237,24 @@ export function renderApp() {
 
   root.innerHTML = `
     <div class="app-container">
-      <!-- Sidebar Navigation -->
-      <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-          <a href="#/" class="brand-badge">
-            <div class="brand-logo-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-              </svg>
-            </div>
-            <div>
-              <div class="brand-text-name">RecallMate AI</div>
-              <div class="brand-text-tagline">Learn smarter. Revise better.</div>
-            </div>
-          </a>
-        </div>
-
-        <nav class="sidebar-nav">
-          <div class="nav-section-title">Core Learning</div>
-          <a href="#/" class="nav-item ${currentPath === "/" ? "active" : ""}">
-            <span class="nav-item-icon">📊</span>
-            <span>Dashboard</span>
-          </a>
-          <a href="#/assistant" class="nav-item ${currentPath === "/assistant" ? "active" : ""}">
-            <span class="nav-item-icon">🤖</span>
-            <span>AI Study Assistant</span>
-            <span class="nav-item-badge badge-purple">Ask</span>
-          </a>
-          <a href="#/classes" class="nav-item ${currentPath.startsWith("/classes") ? "active" : ""}">
-            <span class="nav-item-icon">🏫</span>
-            <span>Classes 6–12</span>
-          </a>
-          <a href="#/notes" class="nav-item ${currentPath.startsWith("/notes") || currentPath === "/add" ? "active" : ""}">
-            <span class="nav-item-icon">📁</span>
-            <span>Smart Notes & Uploads</span>
-            <span class="nav-item-badge badge-purple">${state.notes.length}</span>
-          </a>
-
-          <div class="nav-section-title">Competitive Exams</div>
-          <a href="#/exams" class="nav-item ${currentPath.startsWith("/exams") ? "active" : ""}">
-            <span class="nav-item-icon">🎯</span>
-            <span>Exam Hub</span>
-          </a>
-          <a href="#/mock-test" class="nav-item ${currentPath === "/mock-test" ? "active" : ""}">
-            <span class="nav-item-icon">⏱️</span>
-            <span>AI Mock Test</span>
-          </a>
-          <a href="#/radar" class="nav-item ${currentPath === "/radar" ? "active" : ""}">
-            <span class="nav-item-icon">📡</span>
-            <span>Priority Radar</span>
-            <span class="nav-item-badge badge-amber">Weightage</span>
-          </a>
-          <a href="#/pyq-intelligence" class="nav-item ${currentPath === "/pyq-intelligence" ? "active" : ""}">
-            <span class="nav-item-icon">🔄</span>
-            <span>PYQ Intelligence</span>
-          </a>
-
-          <div class="nav-section-title">Revision & Tools</div>
-          <a href="#/doubts" class="nav-item ${currentPath === "/doubts" ? "active" : ""}">
-            <span class="nav-item-icon">❓</span>
-            <span>AI Doubt Solver</span>
-          </a>
-          <a href="#/planner" class="nav-item ${currentPath === "/planner" ? "active" : ""}">
-            <span class="nav-item-icon">📅</span>
-            <span>Study Planner</span>
-          </a>
-          <a href="#/recovery" class="nav-item ${currentPath === "/recovery" ? "active" : ""}">
-            <span class="nav-item-icon">🛟</span>
-            <span>Stuckpoint Recovery</span>
-            <span class="nav-item-badge badge-amber">${state.recoveries.filter(r => r.status === "struggling").length}</span>
-          </a>
-          <a href="#/resources" class="nav-item ${currentPath === "/resources" ? "active" : ""}">
-            <span class="nav-item-icon">🌐</span>
-            <span>External Resources</span>
-          </a>
-          <a href="#/analytics" class="nav-item ${currentPath === "/analytics" || currentPath === "/progress" || currentPath === "/memory" ? "active" : ""}">
-            <span class="nav-item-icon">📈</span>
-            <span>Performance & Retention</span>
-          </a>
-          <a href="#/settings" class="nav-item ${currentPath === "/settings" ? "active" : ""}">
-            <span class="nav-item-icon">⚙️</span>
-            <span>Settings</span>
-          </a>
-        </nav>
-
-        <div class="sidebar-footer">
-          <div class="user-avatar-circle">${profile.avatar || "🎓"}</div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 0.825rem; font-weight: 600; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(profile.name || "Student")}</div>
-            <div style="font-size: 0.72rem; color: var(--lavender-400);">${profile.classLevel} • ${profile.targetExam ? profile.targetExam.toUpperCase() : "CBSE"}</div>
-          </div>
-        </div>
-      </aside>
-
       <!-- Main Wrapper -->
       <div class="main-wrapper">
         <!-- Top Navigation Bar -->
         <header class="topbar">
           <div class="topbar-left">
-            <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
+            <a href="#/" class="header-brand" aria-label="NOVORA home">
+              <span class="header-brand-mark" aria-hidden="true">N</span>
+              <span class="header-brand-name">NOVORA</span>
+            </a>
             <button class="global-search-btn" onclick="window.RecallMateApp.openSearchModal()">
-              <span>🔍 Search topics, PYQs, syllabi...</span>
+              <span aria-hidden="true">🔍</span>
+              <span class="search-label">Search topics, PYQs, syllabi...</span>
               <kbd class="search-kbd">Ctrl K</kbd>
             </button>
           </div>
 
           <div class="topbar-right">
+            ${renderNavigationMenu(currentPath, state)}
             <!-- Goal Switcher Pill -->
             <button class="goal-switcher-btn" onclick="window.RecallMateApp.openGoalSwitcher()">
               <span>🎯 ${profile.classLevel} • ${profile.targetExam ? profile.targetExam.replace("-", " ").toUpperCase() : "General"}</span>
@@ -402,7 +366,7 @@ function renderDashboardView(state) {
     <!-- Metrics Row -->
     <div class="metrics-grid">
       <div class="card metric-card">
-        <div class="metric-icon-box" style="background: rgba(139, 92, 246, 0.15); color: var(--lavender-500);">⏳</div>
+        <div class="metric-icon-box" style="background: rgba(19, 134, 95, 0.15); color: var(--lavender-500);">⏳</div>
         <div>
           <div class="metric-val">2.8 / ${profile.dailyTargetHours || 3.5}h</div>
           <div class="metric-label">Daily Study Progress</div>
@@ -432,7 +396,7 @@ function renderDashboardView(state) {
     </div>
 
     <!-- AI Study Recommendation Section -->
-    <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%); border-color: var(--lavender-200);">
+    <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(19, 134, 95, 0.1) 0%, rgba(20, 125, 145, 0.05) 100%); border-color: var(--lavender-200);">
       <div style="display: flex; align-items: flex-start; gap: 16px;">
         <span style="font-size: 2rem;">💡</span>
         <div style="flex: 1;">
@@ -601,7 +565,7 @@ function renderAssistantView(state) {
             <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 8px;">
               <span style="font-size: 0.75rem; color: var(--text-muted);">Grounded AI &bull; Formatted with formulas, analogies & revision summary</span>
               <button type="submit" class="btn btn-primary" id="ask-btn">
-                <span>Ask RecallMate</span>
+                <span>Ask NOVORA</span>
                 <span>⚡</span>
               </button>
             </div>
@@ -613,7 +577,7 @@ function renderAssistantView(state) {
           <div class="card" style="padding: 32px; text-align: center; color: var(--text-muted);">
             <div style="font-size: 2.5rem; margin-bottom: 12px;">💡</div>
             <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Ask any academic question above</h3>
-            <p style="font-size: 0.875rem; margin-top: 6px;">RecallMate provides step-by-step solutions, mathematical formulas, real-life analogies, and concise revision summaries.</p>
+            <p style="font-size: 0.875rem; margin-top: 6px;">NOVORA provides step-by-step solutions, mathematical formulas, real-life analogies, and concise revision summaries.</p>
           </div>
         </div>
       </div>
@@ -712,7 +676,7 @@ function renderNotesView(path, state) {
           <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;">
             <span style="font-size: 0.72rem; padding: 2px 8px; background: var(--bg-surface-subtle); border-radius: 4px;">🗂️ ${note.fileType ? note.fileType.toUpperCase() : "TXT"}</span>
             <span style="font-size: 0.72rem; padding: 2px 8px; background: var(--bg-surface-subtle); border-radius: 4px;">📝 ${note.wordCount || 100} words</span>
-            ${note.aiOutputs ? `<span style="font-size: 0.72rem; padding: 2px 8px; background: rgba(139, 92, 246, 0.15); color: var(--lavender-500); border-radius: 4px;">✨ 10 AI Outputs Ready</span>` : ""}
+            ${note.aiOutputs ? `<span style="font-size: 0.72rem; padding: 2px 8px; background: rgba(19, 134, 95, 0.15); color: var(--lavender-500); border-radius: 4px;">✨ 10 AI Outputs Ready</span>` : ""}
           </div>
 
           <div style="display: flex; gap: 8px;">
@@ -759,7 +723,7 @@ function renderExamsView(path, state) {
     <!-- Exam Blueprint & Marking Scheme -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px;">
       <div class="card metric-card">
-        <div class="metric-icon-box" style="background: rgba(139, 92, 246, 0.15); color: var(--lavender-500);">⏱️</div>
+        <div class="metric-icon-box" style="background: rgba(19, 134, 95, 0.15); color: var(--lavender-500);">⏱️</div>
         <div>
           <div class="metric-val">${exam.durationMinutes} mins</div>
           <div class="metric-label">Official Test Duration</div>
@@ -835,7 +799,7 @@ function renderMockTestView(state) {
     </div>
 
     <!-- Official Pattern Banner -->
-    <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%); border-left: 4px solid var(--lavender-500);">
+    <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(19, 134, 95, 0.1) 0%, rgba(20, 125, 145, 0.05) 100%); border-left: 4px solid var(--lavender-500);">
       <div style="font-size: 0.875rem; line-height: 1.6; color: var(--text-primary);">
         <strong>🏛️ Official Pattern Simulation:</strong> Replicates the exact layout of the <strong>National Testing Agency (NTA) Computer-Based Test</strong> and <strong>UPSC Prelims</strong> portal. Features Section A (MCQs) and Section B (Numerical questions with virtual keypad), live countdown timer, and the official 5-state question palette.
       </div>
@@ -976,7 +940,7 @@ function renderActiveMockTestSimulator() {
             <span>⏳</span>
             <span>Time Left: ${formatTimer(test.secondsRemaining)}</span>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="window.RecallMateApp.promptSubmitExamModal()" style="font-weight: 700; background: #2563EB;">Submit Examination</button>
+          <button class="btn btn-primary btn-sm" onclick="window.RecallMateApp.promptSubmitExamModal()" style="font-weight: 700; background: var(--accent-cyan);">Submit Examination</button>
         </div>
       </div>
 
@@ -1137,7 +1101,7 @@ function renderActiveMockTestSimulator() {
             </div>
           </div>
 
-          <button class="btn btn-primary" onclick="window.RecallMateApp.promptSubmitExamModal()" style="width: 100%; padding: 12px; font-weight: 700; background: #2563EB;">
+          <button class="btn btn-primary" onclick="window.RecallMateApp.promptSubmitExamModal()" style="width: 100%; padding: 12px; font-weight: 700; background: var(--accent-cyan);">
             Submit Examination
           </button>
         </div>
@@ -1450,7 +1414,7 @@ function renderDoubtsView(state) {
   `;
 }
 
-// --- 12. Stuckpoint Recovery View (Preserved from Original RecallMate) ---
+// --- 12. Stuckpoint Recovery View ---
 function renderRecoveryView(state) {
   const recoveries = state.recoveries || [];
   const struggling = recoveries.filter(r => r.status === "struggling");
@@ -1539,7 +1503,7 @@ function renderAnalyticsView(state) {
     <!-- Analytics Metrics -->
     <div class="metrics-grid">
       <div class="card metric-card">
-        <div class="metric-icon-box" style="background: rgba(139, 92, 246, 0.15); color: var(--lavender-500);">🧠</div>
+        <div class="metric-icon-box" style="background: rgba(19, 134, 95, 0.15); color: var(--lavender-500);">🧠</div>
         <div>
           <div class="metric-val">88%</div>
           <div class="metric-label">Memory Retention Health</div>
@@ -1572,7 +1536,7 @@ function renderAnalyticsView(state) {
     <div class="card" style="margin-bottom: 24px;">
       <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">Ebbinghaus Forgetting Curve & Spaced Recovery</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
-        Without active revision, 75% of new academic material is forgotten within 48 hours. RecallMate automatically schedules spaced reviews at Day 1, 3, 7, 14, and 30 to lock memory into permanent long-term storage.
+        Without active revision, 75% of new academic material is forgotten within 48 hours. NOVORA automatically schedules spaced reviews at Day 1, 3, 7, 14, and 30 to lock memory into permanent long-term storage.
       </p>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; text-align: center;">
@@ -1617,7 +1581,7 @@ function renderSettingsView(state) {
       <div class="card">
         <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 6px;">AI & Search Provider Integrations</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
-          RecallMate AI includes a comprehensive built-in academic intelligence engine and verified official database that operates offline. You can optionally enter external API keys for live Gemini responses and Google Custom Search.
+          NOVORA includes a comprehensive built-in academic intelligence engine and verified official database that operates offline. You can optionally enter external API keys for live Gemini responses and Google Custom Search.
         </p>
 
         <form onsubmit="window.RecallMateApp.saveApiSettings(event)">
@@ -2114,7 +2078,7 @@ ${response.content}
     modalContainer.innerHTML = `
       <div class="modal-overlay" onclick="if(event.target === this) window.RecallMateApp.closeModals()">
         <div class="modal-content" style="max-width: 800px;">
-          <div style="border-bottom: 2px solid #8B5CF6; padding-bottom: 12px; margin-bottom: 16px;">
+          <div style="border-bottom: 2px solid var(--lavender-500); padding-bottom: 12px; margin-bottom: 16px;">
             <h3 style="font-size: 1.25rem; font-weight: 700;">Examination Summary: ${test.examName}</h3>
             <span style="font-size: 0.8rem; color: var(--text-muted);">Please review your response statistics across all sections before final submission.</span>
           </div>
@@ -2127,7 +2091,7 @@ ${response.content}
                   <th style="padding: 10px;">Total Qs</th>
                   <th style="padding: 10px; color: #16A34A;">Answered</th>
                   <th style="padding: 10px; color: #DC2626;">Not Answered</th>
-                  <th style="padding: 10px; color: #7C3AED;">Marked for Review</th>
+                  <th style="padding: 10px; color: var(--lavender-600);">Marked for Review</th>
                   <th style="padding: 10px; color: #2563EB;">Answered & Marked (Evaluated)</th>
                   <th style="padding: 10px; color: #64748B;">Not Visited</th>
                 </tr>
@@ -2139,7 +2103,7 @@ ${response.content}
                     <td style="padding: 10px; font-weight: 600;">${row.total}</td>
                     <td style="padding: 10px; color: #16A34A; font-weight: 700;">${row.answered}</td>
                     <td style="padding: 10px; color: #DC2626;">${row.notAnswered}</td>
-                    <td style="padding: 10px; color: #7C3AED;">${row.review}</td>
+                    <td style="padding: 10px; color: var(--lavender-600);">${row.review}</td>
                     <td style="padding: 10px; color: #2563EB; font-weight: 600;">${row.answeredReview}</td>
                     <td style="padding: 10px; color: #64748B;">${row.notVisited}</td>
                   </tr>
@@ -2755,7 +2719,7 @@ ${response.content}
         tasks: [
           { text: `Review high-weightage chapter theory in ${subj} (60m)`, completed: false },
           { text: `Solve 10 past examination PYQs with timer (45m)`, completed: false },
-          { text: `Complete today's spaced repetition cards in RecallMate (20m)`, completed: false },
+          { text: `Complete today's spaced repetition cards in NOVORA (20m)`, completed: false },
           { text: `Log any difficult questions into Stuckpoint Recovery`, completed: false }
         ]
       };
@@ -2813,7 +2777,7 @@ ${response.content}
           `).join("")}
         </div>
 
-        <div style="padding: 10px; background: rgba(139, 92, 246, 0.1); border-radius: 8px; font-size: 0.8rem;">
+        <div style="padding: 10px; background: rgba(19, 134, 95, 0.1); border-radius: 8px; font-size: 0.8rem;">
           <strong>⚡ Shortcut:</strong> ${solution.shortcutMethod}
         </div>
       </div>
@@ -2842,7 +2806,7 @@ ${response.content}
       <div class="modal-overlay" onclick="if(event.target === this) window.RecallMateApp.closeModals()">
         <div class="modal-content" style="max-width: 900px; max-height: 92vh; overflow-y: auto;">
           <!-- Scorecard Header -->
-          <div style="border-bottom: 2px solid #8B5CF6; padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div style="border-bottom: 2px solid var(--lavender-500); padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
             <div>
               <span class="nav-item-badge badge-purple">${result.conductingBody || "NTA"} Official Examination Scorecard</span>
               <h2 style="font-size: 1.35rem; font-weight: 700; margin-top: 4px;">${result.examName}</h2>
@@ -2854,7 +2818,7 @@ ${response.content}
           <!-- 4-Card Performance Metrics -->
           <div class="metrics-grid" style="margin-bottom: 20px;">
             <div style="padding: 14px; background: var(--bg-surface-subtle); border-radius: 10px; text-align: center; border: 1px solid var(--border-subtle);">
-              <div style="font-size: 1.5rem; font-weight: 800; color: #8B5CF6;">${result.score} / ${result.totalMarks}</div>
+              <div style="font-size: 1.5rem; font-weight: 800; color: var(--lavender-500);">${result.score} / ${result.totalMarks}</div>
               <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-top: 2px;">Net Score (Marks)</div>
             </div>
             <div style="padding: 14px; background: var(--bg-surface-subtle); border-radius: 10px; text-align: center; border: 1px solid var(--border-subtle);">
@@ -2896,7 +2860,7 @@ ${response.content}
                         <td style="padding: 8px; color: #16A34A; font-weight: 700;">${sec.correct}</td>
                         <td style="padding: 8px; color: #DC2626; font-weight: 700;">${sec.incorrect}</td>
                         <td style="padding: 8px; color: var(--text-muted);">${sec.unattempted}</td>
-                        <td style="padding: 8px; font-weight: 700; color: #8B5CF6;">${sec.netMarks}</td>
+                        <td style="padding: 8px; font-weight: 700; color: var(--lavender-500);">${sec.netMarks}</td>
                         <td style="padding: 8px; font-weight: 600;">${sec.accuracy}%</td>
                       </tr>
                     `).join("")}
@@ -2982,8 +2946,8 @@ ${response.content}
                     `}
 
                     <!-- Step-by-Step Derivation & Explanation -->
-                    <div style="padding: 12px; background: var(--bg-surface); border-radius: 8px; font-size: 0.825rem; line-height: 1.5; border-left: 3px solid #8B5CF6;">
-                      <strong style="color: #8B5CF6;">Official Step-by-Step Explanation:</strong>
+                    <div style="padding: 12px; background: var(--bg-surface); border-radius: 8px; font-size: 0.825rem; line-height: 1.5; border-left: 3px solid var(--lavender-500);">
+                      <strong style="color: var(--lavender-500);">Official Step-by-Step Explanation:</strong>
                       <div style="margin-top: 4px; white-space: pre-wrap; color: var(--text-secondary);">${q.explanation}</div>
                     </div>
                   </div>

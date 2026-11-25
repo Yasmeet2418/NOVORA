@@ -105,7 +105,7 @@ export const handler = async (event) => {
       body: JSON.stringify({
         error: 'NO_API_KEY',
         message: 'Gemini API key is not configured. Get a free API key at https://aistudio.google.com/app/apikey and enter it in Settings.',
-        hint: 'RecallMate can use Google Gemini 1.5/2.0 Flash for zero-cost, lightning-fast academic explanations.'
+        hint: 'NOVORA can use Google Gemini 1.5/2.0 Flash for academic explanations.'
       })
     };
   }
@@ -146,7 +146,7 @@ export const handler = async (event) => {
     problem: 'Response Mode: Advanced Problem-Solving. Step-by-step numerical solution.'
   }[mode] || 'Detailed explanation.';
 
-  const systemInstructionText = `You are RecallMate AI, a premier academic study assistant and competitive exam preparation tutor.
+  const systemInstructionText = `You are NOVORA, an academic study assistant and competitive exam preparation tutor.
 Target Audience: Student preparing for ${classLevel} and ${targetExam}.
 ${languageInstructions}
 ${depthInstructions}

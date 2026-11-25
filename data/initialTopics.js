@@ -1,4 +1,4 @@
-// Initial seed data preserved from the original RecallMate AI app
+// Initial seed data preserved from the original learning app
 // Maintains 100% compatibility with original localStorage schema: recallmate:data:v1
 
 export const SEED_KEYPOINTS_PHOTOSYNTHESIS = [

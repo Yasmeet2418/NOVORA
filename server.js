@@ -1,4 +1,4 @@
-// RecallMate AI — Real Educational Platform Server
+// NOVORA — Educational Platform Server
 // Zero external npm dependencies — Runs natively with Node.js ES Modules (Node 18+)
 // Features:
 // 1. Static SPA web server with MIME types
@@ -313,7 +313,7 @@ async function handleChatRequest(req, res) {
     res.end(JSON.stringify({
       error: 'NO_API_KEY',
       message: 'Gemini API key is not configured. Get a free API key at https://aistudio.google.com/app/apikey and enter it in Settings or set GEMINI_API_KEY in your .env file.',
-      hint: 'RecallMate can use Google Gemini 1.5/2.0 Flash for zero-cost, lightning-fast academic explanations.'
+      hint: 'NOVORA can use Google Gemini 1.5/2.0 Flash for academic explanations.'
     }));
     return;
   }
@@ -357,7 +357,7 @@ async function handleChatRequest(req, res) {
     problem: 'Response Mode: Advanced Problem-Solving. Step-by-step numerical solution with all calculation steps.'
   }[mode] || 'Detailed explanation.';
 
-  const systemInstructionText = `You are RecallMate AI, a premier academic study assistant and competitive exam preparation tutor.
+  const systemInstructionText = `You are NOVORA, an academic study assistant and competitive exam preparation tutor.
 Target Audience: Student preparing for ${classLevel} and ${targetExam}.
 ${languageInstructions}
 ${depthInstructions}
@@ -570,7 +570,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'ok',
-      platform: 'RecallMate AI Platform',
+      platform: 'NOVORA Learning Platform',
       version: '2.2.0',
       tagline: 'Learn smarter. Revise better. Crack your goals.',
       hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
@@ -640,9 +640,9 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log('====================================================');
-  console.log('  RecallMate AI Platform is Running!');
+  console.log('  NOVORA Learning Platform is Running!');
   console.log(`  Local URL: http://localhost:${PORT}`);
-  console.log('  Tagline: "Learn smarter. Revise better. Crack your goals."');
+  console.log('  Tagline: "Learn. Practice. Rise."');
   console.log('  Endpoints:');
   console.log('    • GET  /api/status');
   console.log('    • POST /api/chat   (Streaming SSE & Multimodal)');

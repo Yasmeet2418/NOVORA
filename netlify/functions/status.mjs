@@ -15,7 +15,7 @@ export const handler = async (event) => {
     headers,
     body: JSON.stringify({
       status: 'ok',
-      platform: 'RecallMate AI Platform',
+      platform: 'NOVORA Learning Platform',
       version: '2.2.0',
       tagline: 'Learn smarter. Revise better. Crack your goals.',
       hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
