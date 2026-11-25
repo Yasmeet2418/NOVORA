@@ -144,6 +144,7 @@ Open `index.html` directly in any modern browser (Google Chrome, Microsoft Edge,
 - **Supabase Accounts**: Email/password sign-up, sign-in, and logout. Learning data is cached per account in the browser and synced to that user's protected Supabase row; row-level security prevents accounts from reading or changing another user's row.
 - **Supabase Setup**: Run [`supabase/schema.sql`](./supabase/schema.sql) in the Supabase SQL Editor. In Supabase Authentication settings, set the Site URL and allowed redirect URLs to your deployed site; configure email confirmation as desired.
 - **Deployment**: Local code changes are not live automatically. Push the changes to the connected GitHub branch and wait for Netlify/Railway to finish its deployment before testing the live URL.
+- **Hosted AI Setup**: Set a valid `GEMINI_API_KEY` in the hosting provider's environment variables for shared AI access. Never commit the key. Users can alternatively enter their own Gemini key in **Settings → AI & Search Provider Integrations**.
 - **Local Storage**: The app keeps an account-specific browser cache for responsiveness and offline continuity. AI provider API keys remain local and are excluded from cloud sync.
 - **Zero Cloud Leakage**: Document parsing and text extraction occur strictly on the client side.
 - **Configurable External APIs**: Gemini API keys and Google Search API keys (if used) remain stored on the local browser and are not uploaded to Supabase.

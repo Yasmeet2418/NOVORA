@@ -1666,20 +1666,20 @@ function renderSettingsView(state) {
       <div class="card">
         <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 6px;">AI & Search Provider Integrations</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
-          NOVORA includes a comprehensive built-in academic intelligence engine and verified official database that operates offline. You can optionally enter external API keys for live Gemini responses and Google Custom Search.
+          Add a Gemini key for open-ended AI answers and Google Search credentials for live references. A small built-in reference still covers a few common study topics offline.
         </p>
 
         <form onsubmit="window.RecallMateApp.saveApiSettings(event)">
           <div style="margin-bottom: 14px;">
-            <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">GOOGLE GEMINI API KEY (OPTIONAL)</label>
+            <label for="settings-gemini-key" style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">PERSONAL GOOGLE GEMINI API KEY</label>
             <input
               type="password"
               id="settings-gemini-key"
-              value="${aiSettings.geminiApiKey || ""}"
-              placeholder="AIzaSy..."
+              value="${escapeHtml(aiSettings.geminiApiKey || "")}"
+              placeholder="Enter your Gemini API key"
               style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 0.875rem;"
             />
-            <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; display: block;">Keys remain strictly on your local browser. Never exposed externally.</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; display: block;">Saved in this browser, not synced to Supabase; sent to NOVORA and Google Gemini only when you ask a question.</span>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
@@ -1901,7 +1901,13 @@ window.RecallMateApp = {
     } catch (err) {
       console.error("Could not generate an AI study answer:", err);
       assistantMessage.error = true;
-      assistantMessage.text = `I couldn't get a reliable answer right now. ${err.message || "Please try again in a moment."}`;
+      if (err.code === "NO_API_KEY") {
+        assistantMessage.text = `${err.message}\n\nAdd a Gemini key in Settings → AI & Search Provider Integrations, or ask the site administrator to configure the hosted AI service.`;
+      } else if (err.code === "GEMINI_API_ERROR" && /api key not valid|invalid api key/i.test(err.message || "")) {
+        assistantMessage.text = "The hosted Gemini API key is invalid. Add a valid personal key in Settings → AI & Search Provider Integrations, or ask the site administrator to update the GEMINI_API_KEY in Netlify. No answer was generated.";
+      } else {
+        assistantMessage.text = `I couldn't get a reliable answer right now. ${err.message || "Please try again in a moment."}`;
+      }
     } finally {
       assistantMessage.pending = false;
       assistantLoading = false;
