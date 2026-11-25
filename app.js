@@ -1810,7 +1810,7 @@ window.RecallMateApp = {
           if (Array.isArray(identities) && identities.length === 0) {
             throw new Error("An account with this email already exists. Sign in instead.");
           }
-          authMessage = "Supabase still requires email confirmation. To enable instant sign-in, turn off Confirm email in Authentication → Sign In / Providers → Email. If this account was created while confirmation was on, create it again after changing the setting.";
+          authMessage = "Supabase still requires email confirmation. To enable instant sign-in, turn off Confirm email in Authentication → Sign In / Providers → Email. Existing unconfirmed accounts may need to be confirmed in Authentication → Users before signing in.";
           return;
         }
       } else {
