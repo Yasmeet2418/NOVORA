@@ -21,7 +21,7 @@ export const EXAMS_REGISTRY = {
     officialWebsite: "https://jeemain.nta.nic.in",
     durationMinutes: 180,
     totalMarks: 300,
-    totalQuestions: 90,
+    totalQuestions: 75,
     attemptQuestions: 75,
     markingScheme: {
       correct: 4,
@@ -33,7 +33,7 @@ export const EXAMS_REGISTRY = {
       {
         id: "physics",
         name: "Physics",
-        questionCount: 30,
+        questionCount: 25,
         attemptCount: 25,
         marks: 100,
         chapters: [
@@ -53,7 +53,7 @@ export const EXAMS_REGISTRY = {
       {
         id: "chemistry",
         name: "Chemistry",
-        questionCount: 30,
+        questionCount: 25,
         attemptCount: 25,
         marks: 100,
         chapters: [
@@ -73,7 +73,7 @@ export const EXAMS_REGISTRY = {
       {
         id: "mathematics",
         name: "Mathematics",
-        questionCount: 30,
+        questionCount: 25,
         attemptCount: 25,
         marks: 100,
         chapters: [

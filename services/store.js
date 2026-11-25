@@ -23,9 +23,9 @@ const DEFAULT_AI_SETTINGS = {
   preferredResponseMode: "detailed"
 };
 
-function loadInitialState() {
+function loadInitialState(storageKey = STORAGE_KEY) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageKey ? localStorage.getItem(storageKey) : null;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.topics)) {
@@ -103,6 +103,7 @@ function loadInitialState() {
 
 class Store {
   constructor() {
+    this.storageKey = STORAGE_KEY;
     this.state = loadInitialState();
     this.listeners = new Set();
   }
@@ -118,7 +119,7 @@ class Store {
 
   notify() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      localStorage.setItem(this.storageKey, JSON.stringify(this.state));
     } catch (err) {
       console.warn("Could not save to localStorage:", err);
     }
@@ -127,6 +128,38 @@ class Store {
 
   update(updater) {
     this.state = typeof updater === "function" ? updater(this.state) : { ...this.state, ...updater };
+    this.notify();
+  }
+
+  switchAccount(userId, cloudState, user) {
+    const accountStorageKey = `${STORAGE_KEY}:user:${userId}`;
+    const localRaw = localStorage.getItem(accountStorageKey);
+    const localState = loadInitialState(accountStorageKey);
+    let state = cloudState && Array.isArray(cloudState.topics) ? cloudState : localState;
+
+    if (cloudState && localRaw) {
+      try {
+        const localAccountState = JSON.parse(localRaw);
+        const localSettings = localAccountState.aiSettings || {};
+        state = {
+          ...state,
+          aiSettings: {
+            ...state.aiSettings,
+            geminiApiKey: localSettings.geminiApiKey || "",
+            searchApiKey: localSettings.searchApiKey || "",
+            searchEngineCx: localSettings.searchEngineCx || ""
+          }
+        };
+      } catch (error) {
+        console.warn("Could not restore local AI settings for this account:", error);
+      }
+    }
+
+    if (!cloudState && !localRaw && user?.user_metadata?.full_name) {
+      state.userProfile = { ...state.userProfile, name: user.user_metadata.full_name };
+    }
+    this.storageKey = accountStorageKey;
+    this.state = state;
     this.notify();
   }
 

@@ -61,6 +61,7 @@ Modular, exam-specific dashboards with verified syllabi, official marking scheme
 - **Banking & Government**: SSC CGL Tier 1 (+2/-0.50), Banking (IBPS/SBI), Railways (RRB).
 
 ### 6. Realistic AI Mock Test Generator & NTA CBT / UPSC Simulator
+- **JEE Main Practice Forms**: Ten selectable full-length forms, each with 20 MCQs and 5 numerical questions per subject (75 questions / 300 marks total). Questions are original practice material covering recurring, high-yield syllabus topics; they are not reproduced official PYQs. Forms vary question and option order.
 - **Official Exam Durations Built-In**:
   - **JEE Main**: Official 3 Hours (180 Minutes), 300 Marks.
   - **NEET UG**: Official 3 Hours 20 Minutes (200 Minutes), 720 Marks.
@@ -138,6 +139,9 @@ Open `index.html` directly in any modern browser (Google Chrome, Microsoft Edge,
 ---
 
 ## 🔒 Privacy & Architecture
-- **Local-First Storage**: Student data, notes, and quiz histories are persisted securely in the browser's `localStorage` under `recallmate:data:v1`.
+- **Supabase Accounts**: Email/password sign-up, sign-in, and logout. Learning data is cached per account in the browser and synced to that user's protected Supabase row; row-level security prevents accounts from reading or changing another user's row.
+- **Supabase Setup**: Run [`supabase/schema.sql`](./supabase/schema.sql) in the Supabase SQL Editor. In Supabase Authentication settings, set the Site URL and allowed redirect URLs to your deployed site; configure email confirmation as desired.
+- **Deployment**: Local code changes are not live automatically. Push the changes to the connected GitHub branch and wait for Netlify/Railway to finish its deployment before testing the live URL.
+- **Local Storage**: The app keeps an account-specific browser cache for responsiveness and offline continuity. AI provider API keys remain local and are excluded from cloud sync.
 - **Zero Cloud Leakage**: Document parsing and text extraction occur strictly on the client side.
-- **Configurable External APIs**: Gemini API keys and Google Search API keys (if used) remain stored on the local browser and are never transmitted to unauthorized endpoints.
+- **Configurable External APIs**: Gemini API keys and Google Search API keys (if used) remain stored on the local browser and are not uploaded to Supabase.

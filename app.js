@@ -11,26 +11,128 @@ import { RADAR_EXAMS } from "./data/radarData.js";
 import { PYQ_INTELLIGENCE_DATA } from "./data/pyqData.js";
 import { VERIFIED_RESOURCES, RESOURCE_TYPES } from "./data/resourcesData.js";
 import { REALISTIC_MOCK_BANKS } from "./data/mockTestData.js";
+import { createJeeMainMockForm } from "./data/jeeMainPracticeBank.js";
+import {
+  getAuthSession,
+  loadUserData,
+  saveUserData,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword
+} from "./services/supabaseService.js";
 
 // Global App State
 let currentRoute = window.location.hash.slice(1) || "/";
 let activeMockTest = null;
 let mockTimerInterval = null;
 let searchDebounce = null;
+let authSession = null;
+let authReady = false;
+let authMode = "signin";
+let authLoading = false;
+let authMessage = "";
+let cloudSyncError = "";
+let cloudSyncTimer = null;
 
 // Initialize App
 window.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initRouter();
   initGlobalEvents();
-  renderApp();
-  store.subscribe(() => {
+  store.subscribe((state) => {
+    if (authSession && authReady) scheduleCloudSync(state);
     // Re-render when state changes if not actively taking a timed test
-    if (!activeMockTest) {
+    if (authReady && !activeMockTest) {
       renderApp();
     }
   });
+  initializeAuthentication();
 });
+
+async function initializeAuthentication() {
+  try {
+    authSession = await getAuthSession();
+    if (authSession) {
+      const cloudState = await loadUserData(authSession);
+      store.switchAccount(authSession.user.id, cloudState, authSession.user);
+      authReady = true;
+      renderApp();
+      if (!cloudState) scheduleCloudSync(store.get());
+      return;
+    }
+  } catch (error) {
+    console.error("Could not restore the Supabase session:", error);
+    authMessage = `Could not connect to your account: ${error.message}`;
+    authSession = null;
+  }
+  authReady = true;
+  renderApp();
+}
+
+function scheduleCloudSync(state) {
+  if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(async () => {
+    try {
+      const currentSession = await getAuthSession();
+      if (!currentSession || currentSession.user.id !== authSession?.user.id) return;
+      authSession = currentSession;
+      const cloudData = JSON.parse(JSON.stringify(state));
+      if (cloudData.aiSettings) {
+        cloudData.aiSettings.geminiApiKey = "";
+        cloudData.aiSettings.searchApiKey = "";
+        cloudData.aiSettings.searchEngineCx = "";
+      }
+      await saveUserData(currentSession, cloudData);
+      cloudSyncError = "";
+      const status = document.getElementById("cloud-sync-status");
+      if (status) status.textContent = "Your account data is synced.";
+    } catch (error) {
+      console.error("Could not sync account data:", error);
+      cloudSyncError = `Cloud sync failed: ${error.message}`;
+      const status = document.getElementById("cloud-sync-status");
+      if (status) status.textContent = cloudSyncError;
+    }
+  }, 700);
+}
+
+function renderAuthenticationView() {
+  if (!authReady) {
+    return `<main style="min-height:100vh;display:grid;place-items:center;font-family:Inter,sans-serif;color:#475569;">Connecting to RecallMate...</main>`;
+  }
+
+  const isSignUp = authMode === "signup";
+  const escapedMessage = escapeHtml(authMessage);
+  return `
+    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#f5f3ff,#eff6ff);font-family:Inter,sans-serif;">
+      <section style="width:min(100%,440px);padding:32px;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.1);">
+        <div style="font-size:1.55rem;font-weight:800;color:#0f172a;margin-bottom:6px;">RecallMate AI</div>
+        <p style="color:#64748b;margin:0 0 24px;">${isSignUp ? "Create your account to save your study progress." : "Sign in to continue to your study workspace."}</p>
+        ${authMessage ? `<div role="alert" style="margin-bottom:16px;padding:12px;border-radius:8px;background:#fff1f2;color:#be123c;font-size:.875rem;line-height:1.45;">${escapedMessage}</div>` : ""}
+        <form onsubmit="window.RecallMateApp.submitAuthentication(event)">
+          ${isSignUp ? `
+            <label for="auth-name" style="display:block;margin-bottom:6px;font-size:.85rem;font-weight:600;">Name</label>
+            <input id="auth-name" name="name" autocomplete="name" required maxlength="80" style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:16px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">
+          ` : ""}
+          <label for="auth-email" style="display:block;margin-bottom:6px;font-size:.85rem;font-weight:600;">Email</label>
+          <input id="auth-email" name="email" type="email" autocomplete="email" required style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:16px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">
+          <label for="auth-password" style="display:block;margin-bottom:6px;font-size:.85rem;font-weight:600;">Password</label>
+          <input id="auth-password" name="password" type="password" autocomplete="${isSignUp ? "new-password" : "current-password"}" minlength="${isSignUp ? "8" : "1"}" required style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:20px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">
+          <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;" ${authLoading ? "disabled" : ""}>${authLoading ? "Please wait..." : (isSignUp ? "Create account" : "Sign in")}</button>
+        </form>
+        <p style="margin:18px 0 0;text-align:center;color:#64748b;font-size:.9rem;">
+          ${isSignUp ? "Already have an account?" : "New to RecallMate?"}
+          <button type="button" class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="window.RecallMateApp.setAuthenticationMode('${isSignUp ? "signin" : "signup"}')">${isSignUp ? "Sign in" : "Create account"}</button>
+        </p>
+      </section>
+    </main>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+}
 
 function initTheme() {
   const savedTheme = localStorage.getItem("recallmate:theme") || "light";
@@ -70,6 +172,10 @@ function initGlobalEvents() {
 export function renderApp() {
   const root = document.getElementById("root");
   if (!root) return;
+  if (!authReady || !authSession) {
+    root.innerHTML = renderAuthenticationView();
+    return;
+  }
 
   const state = store.get();
   const profile = state.userProfile || {};
@@ -164,7 +270,7 @@ export function renderApp() {
         <div class="sidebar-footer">
           <div class="user-avatar-circle">${profile.avatar || "🎓"}</div>
           <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 0.825rem; font-weight: 600; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${profile.name || "Student"}</div>
+            <div style="font-size: 0.825rem; font-weight: 600; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(profile.name || "Student")}</div>
             <div style="font-size: 0.72rem; color: var(--lavender-400);">${profile.classLevel} • ${profile.targetExam ? profile.targetExam.toUpperCase() : "CBSE"}</div>
           </div>
         </div>
@@ -207,11 +313,13 @@ export function renderApp() {
               <div class="user-avatar-circle">${profile.avatar || "🎓"}</div>
               <span style="font-size: 0.825rem; font-weight: 600;">🔥 ${profile.studyStreak || 1}d</span>
             </div>
+            <button class="btn btn-secondary btn-sm" onclick="window.RecallMateApp.logout()">Log out</button>
           </div>
         </header>
 
         <!-- Route Content Container -->
         <main class="content-container">
+          <div id="cloud-sync-status" role="status" style="margin-bottom:12px;font-size:.8rem;color:var(--text-muted);">${cloudSyncError || "Your account data syncs automatically."}</div>
           ${renderCurrentRoute(currentPath, state)}
         </main>
       </div>
@@ -282,7 +390,7 @@ function renderDashboardView(state) {
   return `
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
-        <h1 class="page-title">Welcome back, ${profile.name}! 👋</h1>
+        <h1 class="page-title">Welcome back, ${escapeHtml(profile.name || "Student")}! 👋</h1>
         <p class="page-subtitle">Target: <strong>${profile.classLevel}</strong> &bull; Goal: <strong>${profile.targetExam ? profile.targetExam.toUpperCase() : "Board Exams"}</strong></p>
       </div>
       <div style="display: flex; gap: 10px;">
@@ -749,6 +857,14 @@ function renderMockTestView(state) {
             </select>
           </div>
 
+          <div id="jee-mock-form-group" style="margin-bottom: 16px; ${profile.targetExam && profile.targetExam !== "jee-main" ? "display: none;" : ""}">
+            <label for="jee-mock-form-select" style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">JEE MAIN PRACTICE FORM</label>
+            <select id="jee-mock-form-select" style="width: 100%; padding: 11px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 0.9rem;">
+              ${Array.from({ length: 10 }, (_, index) => `<option value="${index + 1}">Practice Form ${String(index + 1).padStart(2, "0")} of 10</option>`).join("")}
+            </select>
+            <small style="display: block; margin-top: 5px; color: var(--text-muted);">Each full form has 75 questions: 20 MCQs and 5 numerical questions per subject. Forms use the same original question bank with question and option order varied.</small>
+          </div>
+
           <div style="margin-bottom: 16px;">
             <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">EXAMINATION DURATION</label>
             <select id="mock-timer-select" style="width: 100%; padding: 11px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 0.9rem; font-weight: 500;">
@@ -849,7 +965,7 @@ function renderActiveMockTestSimulator() {
         <div>
           <div class="nta-exam-title">${test.examName}</div>
           <div class="nta-candidate-meta">
-            <span>Candidate: <strong>${test.candidateName}</strong></span>
+            <span>Candidate: <strong>${escapeHtml(test.candidateName)}</strong></span>
             <span>Roll No: <strong>${test.candidateRoll}</strong></span>
             <span>System: <strong>C042</strong></span>
           </div>
@@ -1582,6 +1698,76 @@ function formatTimer(seconds) {
 window.RecallMateApp = {
   toggleTheme,
 
+  setAuthenticationMode(mode) {
+    authMode = mode === "signup" ? "signup" : "signin";
+    authMessage = "";
+    renderApp();
+  },
+
+  async submitAuthentication(event) {
+    event.preventDefault();
+    if (authLoading) return;
+    const form = event.currentTarget;
+    const email = form.elements.email.value.trim();
+    const password = form.elements.password.value;
+    const name = form.elements.name ? form.elements.name.value.trim() : "";
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    authLoading = true;
+    authMessage = "";
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = authMode === "signup" ? "Creating account..." : "Signing in...";
+    }
+
+    try {
+      let session;
+      if (authMode === "signup") {
+        const result = await signUpWithPassword(email, password, name);
+        session = result?.access_token ? result : null;
+        if (!session) {
+          authMessage = "Account created. Check your email to confirm the account, then sign in.";
+          return;
+        }
+      } else {
+        session = await signInWithPassword(email, password);
+      }
+
+      const cloudState = await loadUserData(session);
+      authSession = session;
+      store.switchAccount(session.user.id, cloudState, session.user);
+      authReady = true;
+      cloudSyncError = "";
+      renderApp();
+      if (!cloudState) scheduleCloudSync(store.get());
+    } catch (error) {
+      console.error("Authentication failed:", error);
+      authMessage = error.message || "Could not authenticate. Please try again.";
+      renderApp();
+    } finally {
+      authLoading = false;
+      if (!authSession) renderApp();
+    }
+  },
+
+  async logout() {
+    const session = authSession;
+    authSession = null;
+    if (cloudSyncTimer) {
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
+    }
+    try {
+      await signOut(session);
+    } catch (error) {
+      console.error("Supabase sign-out request failed:", error);
+      authMessage = `Signed out on this device, but the server sign-out request failed: ${error.message}`;
+    } finally {
+      authReady = true;
+      renderApp();
+    }
+  },
+
   // Assistant interactions
   selectResponseMode(modeId, btn) {
     const parent = document.getElementById("mode-selector");
@@ -1653,6 +1839,8 @@ ${response.content}
   // Mock Test Interactions (Official NTA CBT & UPSC Engine)
   updateMockDurationOptions(examId) {
     const timerSelect = document.getElementById("mock-timer-select");
+    const jeeFormGroup = document.getElementById("jee-mock-form-group");
+    if (jeeFormGroup) jeeFormGroup.style.display = examId === "jee-main" ? "block" : "none";
     if (!timerSelect) return;
     if (examId === "jee-main") {
       timerSelect.value = "180";
@@ -1670,13 +1858,16 @@ ${response.content}
   generateAndStartTest(e) {
     if (e) e.preventDefault();
     const examSelect = document.getElementById("mock-exam-select")?.value || "jee-main";
+    const formNumber = parseInt(document.getElementById("jee-mock-form-select")?.value || "1", 10);
     const durationMins = parseInt(document.getElementById("mock-timer-select")?.value || "180", 10);
     const scope = document.getElementById("mock-scope-select")?.value || "full";
     const bank = REALISTIC_MOCK_BANKS[examSelect] || REALISTIC_MOCK_BANKS["jee-main"];
     const profile = store.get().userProfile || {};
 
     // Clone sections and questions so each attempt is fresh
-    let sections = JSON.parse(JSON.stringify(bank.sections));
+    let sections = examSelect === "jee-main"
+      ? createJeeMainMockForm(formNumber)
+      : JSON.parse(JSON.stringify(bank.sections));
 
     if (scope === "speed") {
       // Speed drill: take top 2 questions from each section
@@ -1698,7 +1889,9 @@ ${response.content}
 
     activeMockTest = {
       examId: examSelect,
-      examName: bank.examName,
+      examName: examSelect === "jee-main"
+        ? `JEE (Main) 2026 - Practice Form ${String(formNumber).padStart(2, "0")} of 10`
+        : bank.examName,
       conductingBody: bank.conductingBody,
       officialDurationMinutes: bank.officialDurationMinutes,
       sections,
@@ -2198,7 +2391,7 @@ ${response.content}
           <form onsubmit="window.RecallMateApp.saveProfileForm(event)">
             <div style="margin-bottom: 12px;">
               <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">STUDENT NAME</label>
-              <input type="text" id="prof-name" value="${profile.name || "Student"}" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary);" required />
+              <input type="text" id="prof-name" value="${escapeHtml(profile.name || "Student")}" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary);" required />
             </div>
             <div style="margin-bottom: 16px;">
               <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">DAILY STUDY TARGET (HOURS)</label>
