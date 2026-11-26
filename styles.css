@@ -303,6 +303,21 @@ body {
   background: var(--bg-surface);
 }
 
+.auth-back-btn {
+  align-self: flex-start;
+  margin-bottom: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-back-btn:hover {
+  color: var(--accent-emerald);
+}
+
 .auth-panel-mobile-brand {
   display: none;
   margin-bottom: 34px;

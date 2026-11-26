@@ -31,6 +31,7 @@ let searchDebounce = null;
 let authSession = null;
 let authReady = false;
 let cloudReady = false;
+let authViewOpen = false;
 let authMode = "signin";
 let authLoading = false;
 let cloudRetrying = false;
@@ -52,6 +53,7 @@ window.addEventListener("DOMContentLoaded", () => {
       renderApp();
     }
   });
+  renderApp();
   initializeAuthentication();
 });
 
@@ -160,7 +162,7 @@ function getAuthenticationErrorMessage(error) {
 
 function renderAuthenticationView() {
   if (!authReady) {
-    return `<main class="auth-loading">Connecting to NOVORA...</main>`;
+    return `<main class="auth-loading"><div>Connecting to NOVORA... <button type="button" class="auth-toggle-btn" onclick="window.RecallMateApp.closeAuthentication()">Back to dashboard</button></div></main>`;
   }
 
   const isSignUp = authMode === "signup";
@@ -190,8 +192,8 @@ function renderAuthenticationView() {
           </div>
           <p class="auth-story-footer">Built for curious minds and ambitious goals.</p>
         </section>
-
         <section class="auth-panel" aria-labelledby="auth-title">
+          <button type="button" class="auth-back-btn" onclick="window.RecallMateApp.closeAuthentication()">← Back to dashboard</button>
           <div class="auth-panel-mobile-brand" aria-hidden="true"><span class="auth-brand-mark">N</span><span>NOVORA</span></div>
           <div class="auth-panel-intro">
             <span class="auth-panel-eyebrow">${isSignUp ? "START YOUR JOURNEY" : "WELCOME BACK"}</span>
@@ -362,15 +364,11 @@ function initGlobalEvents() {
 export function renderApp() {
   const root = document.getElementById("root");
   if (!root) return;
-  if (!authReady) {
+  if (!authSession && authViewOpen) {
     root.innerHTML = renderAuthenticationView();
     return;
   }
-  if (!authSession) {
-    root.innerHTML = renderAuthenticationView();
-    return;
-  }
-  if (!cloudReady) {
+  if (authSession && !cloudReady && authReady) {
     root.innerHTML = renderCloudConnectionView();
     return;
   }
@@ -399,35 +397,35 @@ export function renderApp() {
 
           <div class="topbar-right">
             ${renderNavigationMenu(currentPath, state)}
-            <!-- Goal Switcher Pill -->
-            <button class="goal-switcher-btn" onclick="window.RecallMateApp.openGoalSwitcher()">
-              <span>🎯 ${profile.classLevel} • ${profile.targetExam ? profile.targetExam.replace("-", " ").toUpperCase() : "General"}</span>
-              <span style="font-size: 0.7rem;">▼</span>
-            </button>
-
             <!-- Dark / Light Theme Toggle -->
             <button class="icon-btn" title="Toggle Dark/Light Mode" onclick="window.RecallMateApp.toggleTheme()">
               ${document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙"}
             </button>
-
-            <!-- Notifications Button -->
-            <button class="icon-btn" title="Notifications" onclick="window.RecallMateApp.openNotificationsModal()">
-              🔔
-              ${getRevisionsDueToday().length > 0 ? `<span class="notif-badge-dot"></span>` : ""}
-            </button>
-
-            <!-- User Profile Pill -->
-            <div class="user-profile-pill" onclick="window.RecallMateApp.openProfileModal()">
-              <div class="user-avatar-circle">${profile.avatar || "🎓"}</div>
-              <span style="font-size: 0.825rem; font-weight: 600;">🔥 ${profile.studyStreak || 1}d</span>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="window.RecallMateApp.logout()">Log out</button>
+            ${authSession ? `
+              <button class="goal-switcher-btn" onclick="window.RecallMateApp.openGoalSwitcher()">
+                <span>🎯 ${profile.classLevel} • ${profile.targetExam ? profile.targetExam.replace("-", " ").toUpperCase() : "General"}</span>
+                <span style="font-size: 0.7rem;">▼</span>
+              </button>
+              <button class="icon-btn" title="Notifications" onclick="window.RecallMateApp.openNotificationsModal()">
+                🔔
+                ${getRevisionsDueToday().length > 0 ? `<span class="notif-badge-dot"></span>` : ""}
+              </button>
+              <div class="user-profile-pill" onclick="window.RecallMateApp.openProfileModal()">
+                <div class="user-avatar-circle">${profile.avatar || "🎓"}</div>
+                <span style="font-size: 0.825rem; font-weight: 600;">🔥 ${profile.studyStreak || 1}d</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="window.RecallMateApp.logout()">Log out</button>
+            ` : `
+              <button class="btn btn-secondary btn-sm" onclick="window.RecallMateApp.setAuthenticationMode('signin')">Sign in</button>
+              <button class="btn btn-primary btn-sm" onclick="window.RecallMateApp.setAuthenticationMode('signup')">Sign up</button>
+            `}
           </div>
         </header>
 
         <!-- Route Content Container -->
         <main class="content-container">
-          <div id="cloud-sync-status" role="status" style="margin-bottom:12px;font-size:.8rem;color:var(--text-muted);">${cloudSyncError || "Your account data syncs automatically."}</div>
+          ${authSession ? `<div id="cloud-sync-status" role="status" style="margin-bottom:12px;font-size:.8rem;color:var(--text-muted);">${cloudSyncError || "Your account data syncs automatically."}</div>` : ""}
+          ${authMessage && !authViewOpen ? `<div class="auth-alert" role="status">${escapeHtml(authMessage)}</div>` : ""}
           ${renderCurrentRoute(currentPath, state)}
         </main>
       </div>
@@ -498,8 +496,10 @@ function renderDashboardView(state) {
   return `
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
-        <h1 class="page-title">Welcome back, ${escapeHtml(profile.name || "Student")}! 👋</h1>
-        <p class="page-subtitle">Target: <strong>${profile.classLevel}</strong> &bull; Goal: <strong>${profile.targetExam ? profile.targetExam.toUpperCase() : "Board Exams"}</strong></p>
+        <h1 class="page-title">${authSession ? `Welcome back, ${escapeHtml(profile.name || "Student")}! 👋` : "Welcome to NOVORA! 👋"}</h1>
+        <p class="page-subtitle">${authSession
+          ? `Target: <strong>${profile.classLevel}</strong> &bull; Goal: <strong>${profile.targetExam ? profile.targetExam.toUpperCase() : "Board Exams"}</strong>`
+          : "Explore your study dashboard. Sign in or create an account to save your progress."}</p>
       </div>
       <div style="display: flex; gap: 10px;">
         <a href="#/assistant" class="btn btn-primary">⚡ Ask AI Assistant</a>
@@ -1851,6 +1851,13 @@ window.RecallMateApp = {
 
   setAuthenticationMode(mode) {
     authMode = mode === "signup" ? "signup" : "signin";
+    authViewOpen = true;
+    authMessage = "";
+    renderApp();
+  },
+
+  closeAuthentication() {
+    authViewOpen = false;
     authMessage = "";
     renderApp();
   },
@@ -1903,12 +1910,16 @@ window.RecallMateApp = {
     const session = authSession;
     authSession = null;
     cloudReady = false;
+    authViewOpen = false;
+    cloudSyncError = "";
+    authMessage = "";
     assistantConversation = [];
     assistantLoading = false;
     if (cloudSyncTimer) {
       clearTimeout(cloudSyncTimer);
       cloudSyncTimer = null;
     }
+    store.switchToLocalState();
     try {
       await signOut(session);
     } catch (error) {

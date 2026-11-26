@@ -163,6 +163,12 @@ class Store {
     this.notify();
   }
 
+  switchToLocalState() {
+    this.storageKey = STORAGE_KEY;
+    this.state = loadInitialState();
+    this.notify();
+  }
+
   // --- Profile & Preferences ---
   updateProfile(profileData) {
     this.update(s => ({
