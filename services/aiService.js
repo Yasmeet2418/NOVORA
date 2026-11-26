@@ -50,17 +50,11 @@ export async function askStudyAssistant({
   try {
     const streamResult = await callBackendChat({
       query,
+      mode,
+      conversationHistory,
       classLevel,
       targetExam,
-      depth,
-      mode,
-      language,
-      image,
-      searchWeb,
-      conversationHistory,
-      apiKey: userApiKey,
-      onChunk,
-      onSources
+      onChunk
     });
     return streamResult;
   } catch (backendErr) {
@@ -106,131 +100,51 @@ export async function askStudyAssistant({
 }
 
 /**
- * Call backend /api/chat, supporting JSON and SSE responses
+ * Call the server-side Gemini endpoint without sending provider keys to it.
  */
 async function callBackendChat({
   query,
+  mode,
+  conversationHistory,
   classLevel,
   targetExam,
-  depth,
-  mode,
-  language,
-  image,
-  searchWeb,
-  conversationHistory,
-  apiKey,
-  onChunk,
-  onSources
+  onChunk
 }) {
-  // Format conversation history for multi-turn context
-  const messages = conversationHistory.slice(-6).map(h => ({
-    role: h.sender === "user" ? "user" : "assistant",
-    content: h.text || h.content || ""
-  }));
+  const recentHistory = conversationHistory.slice(-6)
+    .map(message => {
+      const text = message.text || message.content || "";
+      return text ? `${message.sender === "user" ? "User" : "Assistant"}: ${text}` : "";
+    })
+    .filter(Boolean);
+  const message = recentHistory.length
+    ? `${recentHistory.join("\n")}\nUser: ${query}`
+    : query;
 
   const response = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { "x-gemini-key": apiKey } : {})
-    },
-    body: JSON.stringify({
-      prompt: query,
-      messages,
-      image,
-      depth,
-      mode,
-      language,
-      classLevel,
-      targetExam,
-      searchWeb,
-      apiKey
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message })
   });
 
-  // Handle errors
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const errorJson = await response.json().catch(() => ({}));
-    const err = new Error(errorJson.message || `API error ${response.status}`);
-    err.code = errorJson.error || "SERVER_ERROR";
+    const err = new Error(data.error || `API error ${response.status}`);
+    err.code = response.status === 502 || response.status === 429
+      ? "GEMINI_API_ERROR"
+      : "SERVER_ERROR";
     throw err;
   }
 
-  const contentType = response.headers.get("content-type") || "";
-
-  // If response is JSON (e.g. error or non-streaming message)
-  if (contentType.includes("application/json")) {
-    const data = await response.json();
-    if (data.error === "NO_API_KEY") {
-      const err = new Error(data.message);
-      err.code = "NO_API_KEY";
-      err.hint = data.hint;
-      throw err;
-    }
-    if (data.error) {
-      const err = new Error(data.message || data.error);
-      err.code = data.error;
-      throw err;
-    }
-    if (onChunk && data.text) {
-      onChunk(data.text, data.text);
-    }
-    return {
-      title: query.slice(0, 50),
-      content: data.text || "",
-      sources: data.sources || [],
-      mode,
-      classLevel,
-      targetExam
-    };
+  if (typeof data.reply !== "string" || !data.reply.trim()) {
+    throw new Error("The AI service returned an empty answer.");
   }
 
-  // Handle SSE streaming
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let accumulatedText = "";
-  let sources = [];
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop(); // keep partial line
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data:")) continue;
-      const jsonStr = trimmed.slice(5).trim();
-      if (jsonStr === "[DONE]") continue;
-
-      try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.sources && Array.isArray(parsed.sources)) {
-          sources = parsed.sources;
-          if (onSources) onSources(sources);
-        }
-        if (parsed.text) {
-          accumulatedText += parsed.text;
-          if (onChunk) onChunk(accumulatedText, parsed.text);
-        }
-        if (parsed.error) {
-          throw new Error(parsed.error);
-        }
-      } catch (parseErr) {
-        if (parseErr.message && !parseErr.message.includes("JSON")) {
-          throw parseErr;
-        }
-      }
-    }
-  }
+  if (onChunk) onChunk(data.reply, data.reply);
 
   return {
     title: query.slice(0, 50),
-    content: accumulatedText || "No response generated.",
-    sources,
+    content: data.reply,
+    sources: [],
     mode,
     classLevel,
     targetExam
