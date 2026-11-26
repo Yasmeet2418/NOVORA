@@ -303,6 +303,7 @@ async function handleChatRequest(req, res) {
     searchWeb = false,
     apiKey: clientApiKey = ''
   } = body;
+  const userPrompt = typeof body.message === 'string' ? body.message : prompt;
 
   const headerKey = req.headers['x-gemini-key'] || '';
   const activeApiKey = (clientApiKey || headerKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
@@ -321,9 +322,9 @@ async function handleChatRequest(req, res) {
   // Optionally perform live web search to ground response
   let searchSources = [];
   let searchContext = '';
-  if (searchWeb || /date|notification|schedule|admit|result|syllabus|cutoff|eligibility|latest|official/i.test(prompt)) {
+  if (searchWeb || /date|notification|schedule|admit|result|syllabus|cutoff|eligibility|latest|official/i.test(userPrompt)) {
     try {
-      searchSources = await executeWebSearch({ query: prompt, exam: targetExam, officialOnly: false });
+      searchSources = await executeWebSearch({ query: userPrompt, exam: targetExam, officialOnly: false });
       if (searchSources.length > 0) {
         searchContext = `\n\n### VERIFIED REAL-TIME WEB SEARCH RESULTS (Use these official citations to answer):\n` +
           searchSources.map((s, i) => `[Source ${i + 1}]: "${s.title}" (${s.isOfficial ? 'OFFICIAL VERIFIED' : 'Third-Party'}) - Link: ${s.url}\nSummary: ${s.snippet}`).join('\n\n') +
@@ -388,7 +389,7 @@ ${searchContext}`;
 
   // Current turn parts
   const currentParts = [];
-  currentParts.push({ text: prompt || 'Please explain this topic.' });
+  currentParts.push({ text: userPrompt || 'Please explain this topic.' });
 
   // Handle multimodal image
   if (image && image.data) {
@@ -406,7 +407,7 @@ ${searchContext}`;
     parts: currentParts
   });
 
-  const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${activeApiKey}`;
+  const geminiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
   const payload = {
     contents,
@@ -425,7 +426,10 @@ ${searchContext}`;
     for (let attempt = 0; attempt < 3; attempt++) {
       upstreamResp = await fetch(geminiEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': activeApiKey
+        },
         body: JSON.stringify(payload)
       });
       if (upstreamResp.status !== 503 || attempt === 2) break;
@@ -458,7 +462,7 @@ ${searchContext}`;
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ text, sources: searchSources }));
+    res.end(JSON.stringify({ reply: text, text, sources: searchSources }));
   } catch (err) {
     console.error('Gemini request failed:', err);
     res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -541,7 +545,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (parsedUrl === '/api/chat' && req.method === 'POST') {
+  if ((parsedUrl === '/api/chat' || parsedUrl === '/.netlify/functions/chat') && req.method === 'POST') {
     await handleChatRequest(req, res);
     return;
   }

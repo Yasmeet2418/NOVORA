@@ -61,7 +61,10 @@ export async function askStudyAssistant({
     console.warn("Backend streaming chat failed or unavailable:", backendErr.message);
 
     // If the error was explicitly missing API key, pass it forward
-    if (backendErr.code === "NO_API_KEY") {
+    if (backendErr.code === "NO_API_KEY" && !userApiKey) {
+      throw backendErr;
+    }
+    if (backendErr.code === "GEMINI_API_ERROR" && !userApiKey) {
       throw backendErr;
     }
 
@@ -83,7 +86,7 @@ export async function askStudyAssistant({
         });
       } catch (geminiErr) {
         console.warn("Direct Gemini call failed:", geminiErr);
-        lastError = geminiErr;
+        throw geminiErr;
       }
     }
 
@@ -127,11 +130,16 @@ async function callBackendChat({
   });
 
   const data = await response.json().catch(() => ({}));
+  if (data.error === "NO_API_KEY") {
+    const err = new Error(data.message || "No Gemini API key is configured.");
+    err.code = "NO_API_KEY";
+    throw err;
+  }
   if (!response.ok) {
-    const err = new Error(data.error || `API error ${response.status}`);
-    err.code = response.status === 502 || response.status === 429
+    const err = new Error(data.message || data.error || `API error ${response.status}`);
+    err.code = data.error || (response.status === 502 || response.status === 429
       ? "GEMINI_API_ERROR"
-      : "SERVER_ERROR";
+      : "SERVER_ERROR");
     throw err;
   }
 
@@ -155,7 +163,7 @@ async function callBackendChat({
  * Direct Gemini API Caller (Client-side fallback)
  */
 async function callDirectGemini({ apiKey, query, classLevel, targetExam, depth, mode, language, conversationHistory, onChunk }) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
   const langPrompt = language === "hi"
     ? "Answer in formal Hindi (हिन्दी) with English technical terms in parentheses."
@@ -185,7 +193,10 @@ Rules:
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey
+    },
     body: JSON.stringify({
       contents,
       generationConfig: {
