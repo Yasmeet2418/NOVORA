@@ -1,6 +1,7 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabaseConfig.js";
 
 const SESSION_KEY = "recallmate:supabase-session:v1";
+const REQUEST_TIMEOUT_MS = 15000;
 const DATA_ENDPOINT = `${SUPABASE_URL}/rest/v1/recallmate_user_data`;
 const PROFILE_ENDPOINT = `${SUPABASE_URL}/rest/v1/profiles`;
 const IS_NETLIFY_DEPLOY = typeof window !== "undefined" &&
@@ -8,36 +9,48 @@ const IS_NETLIFY_DEPLOY = typeof window !== "undefined" &&
   !["localhost", "127.0.0.1"].includes(window.location.hostname);
 
 async function request(path, { method = "GET", body, session, headers = {} } = {}) {
+  const endpoint = new URL(path, SUPABASE_URL).pathname;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response;
+  let responseBody;
   try {
-    response = IS_NETLIFY_DEPLOY
-      ? await fetch("/api/supabase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path,
-          method,
-          body: body === undefined ? null : body,
-          accessToken: session?.access_token || null,
-          prefer: headers.Prefer || null
+    try {
+      response = IS_NETLIFY_DEPLOY
+        ? await fetch("/api/supabase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path,
+            method,
+            body: body === undefined ? null : body,
+            accessToken: session?.access_token || null,
+            prefer: headers.Prefer || null
+          }),
+          signal: controller.signal
         })
-      })
-      : await fetch(`${SUPABASE_URL}${path}`, {
-        method,
-        headers: {
-          apikey: SUPABASE_PUBLISHABLE_KEY,
-          "Content-Type": "application/json",
-          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          ...headers
-        },
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {})
-      });
-  } catch (error) {
-    const endpoint = new URL(path, SUPABASE_URL).pathname;
-    throw new Error(`Could not reach Supabase (${method} ${endpoint}): ${error.message || String(error)}`);
+        : await fetch(`${SUPABASE_URL}${path}`, {
+          method,
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            "Content-Type": "application/json",
+            ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            ...headers
+          },
+          ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+          signal: controller.signal
+        });
+      responseBody = await response.text();
+    } catch (error) {
+      const detail = error?.name === "AbortError"
+        ? `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`
+        : error.message || String(error);
+      throw new Error(`Could not reach Supabase (${method} ${endpoint}): ${detail}`);
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 
-  const responseBody = await response.text();
   let result = null;
   if (responseBody) {
     try {

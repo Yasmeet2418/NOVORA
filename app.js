@@ -161,10 +161,6 @@ function getAuthenticationErrorMessage(error) {
 }
 
 function renderAuthenticationView() {
-  if (!authReady) {
-    return `<main class="auth-loading"><div>Connecting to NOVORA... <button type="button" class="auth-toggle-btn" onclick="window.RecallMateApp.closeAuthentication()">Back to dashboard</button></div></main>`;
-  }
-
   const isSignUp = authMode === "signup";
   const escapedMessage = escapeHtml(authMessage);
   return `
@@ -200,6 +196,7 @@ function renderAuthenticationView() {
             <h2 id="auth-title">${isSignUp ? "Create your account" : "Sign in to NOVORA"}</h2>
             <p>${isSignUp ? "Save your learning progress and make a plan that fits you." : "Your study space is ready when you are."}</p>
           </div>
+          ${!authReady ? `<div class="auth-alert" role="status">Checking for an existing account session. You can return to the dashboard while this finishes.</div>` : ""}
           ${authMessage ? `<div class="auth-alert" role="alert">${escapedMessage}</div>` : ""}
           <form class="auth-form" onsubmit="window.RecallMateApp.submitAuthentication(event)">
           ${isSignUp ? `
@@ -216,7 +213,7 @@ function renderAuthenticationView() {
               <label for="auth-password">Password</label>
               <input class="auth-input" id="auth-password" name="password" type="password" autocomplete="${isSignUp ? "new-password" : "current-password"}" minlength="${isSignUp ? "8" : "1"}" required placeholder="${isSignUp ? "At least 8 characters" : "Enter your password"}">
             </div>
-            <button type="submit" class="btn btn-primary auth-submit" ${authLoading ? "disabled" : ""}>${authLoading ? "Please wait..." : (isSignUp ? "Create my account" : "Sign in")}<span aria-hidden="true">→</span></button>
+            <button type="submit" class="btn btn-primary auth-submit" ${authLoading || !authReady ? "disabled" : ""}>${authLoading ? "Please wait..." : !authReady ? "Checking account..." : (isSignUp ? "Create my account" : "Sign in")}<span aria-hidden="true">→</span></button>
           </form>
           <p class="auth-switch">
             ${isSignUp ? "Already have an account?" : "New to NOVORA?"}
